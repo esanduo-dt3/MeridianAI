@@ -39,6 +39,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-030](#d-030) | Rewrite and grade only when retrieval is uncertain | Accepted | Owner | 2026-09-16 |
 | [D-031](#d-031) | Fall back to the fast model when the answer model is unavailable | Superseded by D-032 | Engineering | 2026-09-16 |
 | [D-032](#d-032) | Run on the Gemini free tier with a model chain and cooldowns | Accepted | Owner | 2026-09-16 |
+| [D-033](#d-033) | Pace document embedding under the free-tier quota | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -444,3 +445,20 @@ Each of these closes a gap the UI or the guardrails need.
   - Answer quality can vary within a session. `agent_answers.model` records the model that answered.
   - Golden-set and Gate G1 runs should report the models used. Running the full golden set in one sitting may exhaust the free quota; spread it out, or use a paid key for the measured run.
   - The p50 target under 8 seconds is not reliable on the free tier, because Google deprioritises free traffic at busy times.
+
+## D-033
+
+**Pace document embedding under the free-tier quota**
+
+- **Context.** A 6.8 MB Word document (`PowerProx_Documentation.docx`, 159 chunks) failed with "Embedding failed". The free Gemini tier allows 100 embedding requests a minute and counts every text in a batch as one request. The first batch of 100 used the whole minute, and the second batch was refused. The gateway retried after 0.8 and 1.6 seconds, which could never succeed. The error also wrongly pointed at the API key.
+- **Decision.**
+  - The gateway keeps a one-minute window of embedded texts (`EMBED_REQUESTS_PER_MINUTE`, default 100) and waits before a batch that would go over it. Document embedding leaves 10 of those free, so a question asked during a large ingestion is not held up.
+  - A per-minute quota error waits as long as the provider asks, up to five attempts.
+  - A daily quota error fails at once as `QuotaExceeded`, and the document shows "The daily Gemini embedding quota is used up".
+  - Embedding never falls back to another model, because its vectors would not match the stored ones.
+- **Why.** Ingestion runs in the background, so waiting a minute costs nothing a person sees, while failing loses the upload.
+- **Consequences.**
+  - A document of about 1,000 chunks takes about 10 minutes on the free tier. It stays in Processing meanwhile.
+  - The window is per server process. Several processes sharing one key would need a shared limiter.
+  - For a paid key, raise `EMBED_REQUESTS_PER_MINUTE`.
+  - Verified live: the 159-chunk document was reprocessed to ready in 73 seconds with all 159 embeddings stored.

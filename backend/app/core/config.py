@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     gemini_fallback_models: str = "gemini-3-flash-preview"
     gemini_embed_model: str = "gemini-embedding-001"
     embed_dim: int = 1536                                # must match chunk_embeddings.embedding
+    # The free tier allows 100 embedded texts a minute, each text counted as a
+    # request. Raise both for a paid key (D-033).
+    embed_requests_per_minute: int = 100
+    embed_batch_size: int = 100
     # A hard deadline per model call. A model that times out or hits its quota
     # is skipped for a cooldown and the next model in the chain is used (D-031, D-032).
     llm_timeout_seconds: float = 15.0

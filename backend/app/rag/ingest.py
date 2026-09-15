@@ -24,7 +24,7 @@ from anyio import to_thread
 from app.core import audit
 from app.core.config import get_settings
 from app.core.supabase import Db, open_service_db
-from app.llm.gateway import ModelError, get_gateway
+from app.llm.gateway import ModelError, QuotaExceeded, get_gateway
 from app.rag.chunker import Chunk, chunk_document
 from app.rag.parse import parse_file
 
@@ -74,8 +74,12 @@ async def _process(db: Db, *, document_id: str, workspace_id: str, file_name: st
 
         try:
             vectors = await get_gateway().embed([c.embed_text for c in chunks], "document")
+        except QuotaExceeded as exc:
+            if exc.daily:
+                raise IngestFailure("The daily Gemini embedding quota is used up. Reprocess this document tomorrow, or use a paid key.") from exc
+            raise IngestFailure("The Gemini embedding quota was busy. Wait a minute, then reprocess this document.") from exc
         except ModelError as exc:
-            raise IngestFailure("Embedding failed. Check the model provider key and try again.") from exc
+            raise IngestFailure("Embedding failed because the model provider returned an error. Try reprocessing.") from exc
 
         settings = get_settings()
         embedding_ids = [str(uuid.uuid4()) for _ in chunks]
