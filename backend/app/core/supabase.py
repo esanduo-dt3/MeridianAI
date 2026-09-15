@@ -12,6 +12,7 @@ Two clients, deliberately different (docs/decisions.md D-018):
 """
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
@@ -77,6 +78,13 @@ class Db:
         )
         return rows[0]
 
+    async def insert_many(self, table: str, rows: list[dict[str, Any]], batch: int = 50) -> None:
+        """Bulk insert without returning rows, in batches to bound request size."""
+        for start in range(0, len(rows), batch):
+            await self._send(
+                "POST", f"/{table}", json=rows[start : start + batch], headers={"Prefer": "return=minimal"}
+            )
+
     async def update(self, table: str, match: dict[str, str], values: dict[str, Any], select: str = "*") -> list[dict[str, Any]]:
         return await self._send(
             "PATCH",
@@ -110,12 +118,19 @@ async def user_db(user: AuthenticatedUser = Depends(get_current_user)) -> AsyncI
         yield Db(client)
 
 
-async def service_db() -> AsyncIterator[Db]:
+@asynccontextmanager
+async def open_service_db() -> AsyncIterator[Db]:
+    """Service-role client for work outside a request, such as background ingestion."""
     settings = get_settings()
     key = settings.supabase_service_role_key.get_secret_value()
     async with httpx.AsyncClient(
         base_url=settings.supabase_rest_url,
         headers={"apikey": key, "Authorization": f"Bearer {key}"},
-        timeout=10.0,
+        timeout=30.0,
     ) as client:
         yield Db(client)
+
+
+async def service_db() -> AsyncIterator[Db]:
+    async with open_service_db() as db:
+        yield db

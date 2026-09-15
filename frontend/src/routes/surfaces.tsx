@@ -8,7 +8,6 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   ChatTeardropText,
-  Files,
   ListMagnifyingGlass,
   NotePencil,
   Pulse,
@@ -62,21 +61,6 @@ export function NotesPage() {
       />
       <EmptyState icon={NotePencil} title="No notes yet">
         Notes you create will be listed here, newest first.
-      </EmptyState>
-    </Page>
-  )
-}
-
-export function DocumentsPage() {
-  return (
-    <Page>
-      <PageHeader
-        title="Documents"
-        status="not-built"
-        description="PDF and Word files, split into passages the agent can cite down to the character."
-      />
-      <EmptyState icon={Files} title="No documents yet">
-        Uploaded files appear here with their processing status, so you can see when a document is ready to ask about.
       </EmptyState>
     </Page>
   )

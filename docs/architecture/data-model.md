@@ -38,13 +38,13 @@ erDiagram
 ## Content
 
 **`documents`**
-`id` · `workspace_id` · `uploaded_by` · `file_path` (storage path `{workspace_id}/{document_id}/{file_name}`) · `file_name`, `mime_type`, `size_bytes`, `parse_error` ([D-011](../decisions.md#d-011)) · `parsed_status` (`pending`, `processing`, `ready`, `failed`) · `created_at`
+`id` · `workspace_id` · `uploaded_by` · `file_path` (storage path `{workspace_id}/{document_id}/{file_name}`) · `file_name`, `mime_type`, `size_bytes`, `parse_error` ([D-011](../decisions.md#d-011)) · `parsed_status` (`pending`, `processing`, `ready`, `failed`) · `created_at` · `doc_type` (`pdf`, `docx`), `content_text` (canonical extracted text; chunk offsets index into it), `page_count`, `chunk_count`, `parse_stats`, `content_hash` (unique per workspace), `processed_at` ([D-023](../decisions.md#d-023))
 
 **`chunks`**
-`id` · `document_id` · `workspace_id`, `chunk_index` ([D-008](../decisions.md#d-008)) · `content` · `char_start`, `char_end` (`char_end > char_start`) · `embedding_ref` → `chunk_embeddings` · `content_tsv` (generated `tsvector`, the sparse signal, [D-005](../decisions.md#d-005)) · `created_at`
+`id` · `document_id` · `workspace_id`, `chunk_index` ([D-008](../decisions.md#d-008)) · `content` (always `documents.content_text[char_start:char_end]`) · `char_start`, `char_end` · `embedding_ref` → `chunk_embeddings` · `created_at` · `kind` (`text`, `table`, `code`), `section`, `page`, `token_count`, `context` (heading path and table header; embedded but not cited) · `search_tsv` (generated, weighted `context` + `content`, the keyword signal) ([D-023](../decisions.md#d-023), [D-025](../decisions.md#d-025))
 
 **`chunk_embeddings`** ([D-005](../decisions.md#d-005))
-`id` · `workspace_id` · `model` · `embedding vector(1536)` with an HNSW cosine index · `created_at`
+`id` · `workspace_id` · `document_id` (cascade delete) · `model` (e.g. `gemini-embedding-001@1536`) · `embedding vector(1536)`, unit length, HNSW cosine index · `created_at`
 
 **`notes`**
 `id` · `workspace_id` · `created_by` · `title`, `created_at` ([D-011](../decisions.md#d-011)) · `content` (jsonb block tree, must be an object) · `updated_at` (maintained by trigger)
@@ -55,10 +55,10 @@ erDiagram
 ## Agent, retrieval and oversight
 
 **`retrieval_runs`**. One row per question asked.
-`id` · `workspace_id` · `asked_by` ([D-011](../decisions.md#d-011)) · `question` · `candidates_json` · `rerank_scores_json` · `grade_outcome` · `retry_count` · `latency_ms` · `created_at`
+`id` · `workspace_id` · `asked_by` ([D-011](../decisions.md#d-011)) · `question` · `candidates_json` (per attempt: query, grade, and every candidate's dense rank and similarity, keyword rank and score, fused and rerank scores) · `rerank_scores_json` (final passages) · `grade_outcome` · `retry_count` · `latency_ms` · `final_query`, `profile`, `top_score` · `created_at`
 
 **`agent_answers`**
-`id` · `workspace_id` · `asked_by`, `retrieval_run_id` ([D-011](../decisions.md#d-011)) · `question` · `answer` · `confidence` (0–1, **uncalibrated**) · `groundedness_pass` · `created_at`
+`id` · `workspace_id` · `asked_by`, `retrieval_run_id` ([D-011](../decisions.md#d-011)) · `question` · `answer` · `confidence` (0–1, **uncalibrated**, [D-027](../decisions.md#d-027)) · `groundedness_pass` · `created_at` · `flagged`, `flag_reasons`, `general_knowledge`
 
 **`answer_citations`**
 `id` · `answer_id` · `chunk_id` · `ordinal` (the `[n]` marker, [D-011](../decisions.md#d-011)) · `created_at`
@@ -86,6 +86,8 @@ erDiagram
 | `public.approve_agent_action(action, approver)` | Function (service role only) | Re-checks Admin, writes the task as `source = 'agent'`, records the decision and audit entry in one transaction |
 | `public.reject_agent_action(action, approver)` | Function (service role only) | Re-checks Admin, records the rejection and audit entry; writes no task |
 | `public.find_user_id_by_email(email)` | Function (service role only) | Finds an account for adding a member by email |
+| `public.match_chunks_dense(workspace, embedding, count, document_ids)` | Function (runs as caller) | Cosine search over the workspace's embeddings, optional document filter |
+| `public.match_chunks_sparse(workspace, query, count, document_ids)` | Function (runs as caller) | Full-text search (any term) over the workspace's chunks, ranked by cover density |
 | `audit_log_no_update` | Trigger | Rejects updates and deletes on `audit_log` |
 | `workspace_members_keep_one_admin` | Trigger | A workspace keeps at least one Admin |
 | `notes_touch_updated_at` | Trigger | Maintains `notes.updated_at` |

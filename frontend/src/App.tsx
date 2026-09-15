@@ -8,7 +8,9 @@ import { queryClient } from './lib/queryClient'
 import { MembersPage } from './routes/MembersPage'
 import { NotFound } from './routes/NotFound'
 import { SignIn } from './routes/SignIn'
-import { AskPage, AuditLogPage, DocumentsPage, NotesPage, PipelineHealthPage, ReviewQueuePage } from './routes/surfaces'
+import { AskPage, AuditLogPage, NotesPage, PipelineHealthPage, ReviewQueuePage } from './routes/surfaces'
+import { DocumentsPage } from './routes/DocumentsPage'
+import { DocumentViewer } from './routes/DocumentViewer'
 import { TasksPage } from './routes/TasksPage'
 import { Welcome } from './routes/Welcome'
 import { ThemeProvider, useTheme } from './theme/ThemeProvider'
@@ -50,6 +52,7 @@ export default function App() {
                       <Route path="ask" element={<AskPage />} />
                       <Route path="notes" element={<NotesPage />} />
                       <Route path="documents" element={<DocumentsPage />} />
+                      <Route path="documents/:documentId" element={<DocumentViewer />} />
                       <Route path="tasks" element={<TasksPage />} />
                       <Route path="members" element={<MembersPage />} />
                       <Route path="admin/review" element={<ReviewQueuePage />} />

@@ -103,3 +103,38 @@ export interface TaskInput {
   assignee_id?: string | null
   parent_task_id?: string | null
 }
+
+export type ParsedStatus = 'pending' | 'processing' | 'ready' | 'failed'
+
+export interface DocumentSummary {
+  id: string
+  file_name: string
+  doc_type: 'pdf' | 'docx' | null
+  mime_type: string
+  size_bytes: number
+  parsed_status: ParsedStatus
+  parse_error: string | null
+  page_count: number | null
+  chunk_count: number
+  parse_stats: Record<string, number>
+  created_at: string
+  processed_at: string | null
+  uploaded_by: { id: string; email: string; full_name: string | null } | null
+}
+
+export interface ChunkInfo {
+  id: string
+  chunk_index: number
+  /** Unicode code point offsets into DocumentDetail.content_text. */
+  char_start: number
+  char_end: number
+  page: number | null
+  section: string
+  kind: 'text' | 'table' | 'code'
+  token_count: number
+}
+
+export interface DocumentDetail extends DocumentSummary {
+  content_text: string | null
+  chunks: ChunkInfo[]
+}

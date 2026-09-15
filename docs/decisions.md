@@ -28,6 +28,11 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-019](#d-019) | Frontend data and interaction libraries | Accepted | Engineering | 2026-09-15 |
 | [D-020](#d-020) | Task List and Board views with subtasks | Accepted | Owner | 2026-09-15 |
 | [D-021](#d-021) | Members may reorder tasks as well as change status | Accepted | Engineering | 2026-09-15 |
+| [D-022](#d-022) | Week 1 ingestion: PDF and Word, text only | Accepted | Owner | 2026-09-16 |
+| [D-023](#d-023) | Chunks are exact spans of a canonical document text | Accepted | Engineering | 2026-09-16 |
+| [D-024](#d-024) | PyMuPDF for PDF parsing, licence flagged | Accepted | Owner | 2026-09-16 |
+| [D-025](#d-025) | The workspace is the search namespace | Accepted | Owner | 2026-09-16 |
+| [D-026](#d-026) | Gemini behind a provider gateway, Voyage for reranking | Accepted | Owner | 2026-09-16 |
 
 ---
 
@@ -276,3 +281,69 @@ Each of these closes a gap the UI or the guardrails need.
 - **Context.** [D-006](#d-006) limits Members to changing a task's status. On a board, moving a card between columns changes both status and position.
 - **Decision.** Members may change `status` and `position`, and nothing else. This is enforced by the API (403) and by the `tasks_member_update_guard` trigger.
 - **Why.** Ordering carries no content. Without it, a Member could move a card to another column but not place it where they dropped it.
+
+## D-022
+
+**Week 1 ingestion: PDF and Word, text only**
+
+- **Decision.** Only PDF and Word (.docx) documents are accepted, matching the PRD's MUST scope.
+  - **Kept:** layout-aware parsing — tables as Markdown, reading order with two-column detection, heading levels from typography or styles, and removal of running headers and footers.
+  - **Left out for Week 1:** OCR of scanned pages, captioning of figures, and model-written context sentences per chunk.
+- **Why.** Faster and cheaper ingestion, and no model calls during parsing.
+- **Consequences.** A scanned PDF yields no text. The upload fails with "No text was found. The PDF looks scanned", and the parse stats record `pages_without_text`. Excel, PowerPoint and images are rejected with 415.
+
+## D-023
+
+**Chunks are exact spans of a canonical document text**
+
+- **Context.** Non-negotiable 3 requires citations with character offsets, so a citation must point at text that exists exactly as the model read it.
+- **Decision.**
+  - Each document stores `content_text`, built from the parsed elements joined by a blank line.
+  - Every chunk's `content` equals `content_text[char_start:char_end]`, by construction:
+    - splits happen on sentence, word, row or blank-line boundaries found in that text;
+    - merges only extend spans.
+  - The heading path, and a table's header row for continuation pieces, are stored separately as `context`. They are embedded and shown to the model, but never part of the cited passage.
+  - Offsets count Unicode code points, as Python and Postgres do. The frontend must slice by code point, not UTF-16 unit.
+- **Consequences.**
+  - Citations highlight the extracted text, not a rendering of the original PDF page; the page number is shown alongside.
+  - Tests assert the invariant on generated PDF and Word files.
+
+## D-024
+
+**PyMuPDF for PDF parsing, licence flagged**
+
+- **Context.** PyMuPDF gives the best table and layout detection available, but it is dual-licensed AGPL-3.0 or commercial. Serving an AGPL component over a network can oblige the operator to publish the service's source.
+- **Decision.** Use PyMuPDF for the Week 1 build.
+- **Before production:** either obtain a commercial licence from Artifex, or replace it with an MIT-licensed parser such as pdfplumber and re-check table extraction quality. Parsing is isolated in `backend/app/rag/parsers/pdf.py`, so the swap is contained.
+
+## D-025
+
+**The workspace is the search namespace**
+
+- **Decision.**
+  - Documents are uploaded into a chosen workspace (the caller must be an Admin there).
+  - Every document, chunk and embedding row carries that `workspace_id`.
+  - Both search legs (`match_chunks_dense` and `match_chunks_sparse`) filter on `workspace_id` before ranking, and accept an optional list of document ids for narrower filtering.
+  - The functions run as the caller, so row-level security enforces the same boundary.
+  - Vectors stay in Supabase pgvector, confirming [D-005](#d-005). The dense leg uses pgvector 0.8 iterative index scans so filtering does not starve results.
+- **Consequences.** A question never touches another workspace's chunks, even through a coding mistake in the API. A very large workspace can later be moved to a partition without changing the API.
+
+## D-026
+
+**Gemini behind a provider gateway, Voyage for reranking**
+
+- **Decision.**
+  - All model calls go through `app/llm/gateway.py`, a swappable provider interface with retries and an in-process response cache.
+  - **Provider:** Gemini via `google-genai`:
+    - `gemini-3.5-flash` for answers;
+    - `gemini-3.5-flash-lite` for grading, query rewriting and groundedness checks;
+    - both with thinking level `minimal`;
+    - `gemini-embedding-001` at 1536 dimensions, normalised to unit length, with retrieval task types.
+  - **Reranking:** Voyage `rerank-2.5`, whose [0, 1] scores drive the confidence gate.
+  - Model names are configuration, not code. The 2.5 models are not available to new Gemini API keys; the 3.5 models were chosen by live latency on a JSON answer: flash with minimal thinking about 1.2 s, flash-lite about 1.0 s, 3.6-flash 2.8 to 11.6 s.
+- **Why.** The PRD names a thin swappable gateway with a response cache. A cross-encoder reranker materially improves precision and gives a meaningful score to state confidence from.
+- **Consequences.**
+  - Requires `GEMINI_API_KEY` and `VOYAGE_API_KEY`.
+  - Without Voyage, retrieval falls back to fusion order plus an LLM grade, and confidence is reported as unavailable.
+  - The response cache is per process. A shared cache for demo pre-warming is Day 5 work.
+

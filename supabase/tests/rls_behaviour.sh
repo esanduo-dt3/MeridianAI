@@ -124,6 +124,24 @@ check "a proposal cannot be approved twice" service fail "select public.approve_
 check "rejection writes no task" service "=rejected|0" "select r.status || '|' || (select count(*) from public.tasks where title = 'Unwanted') from public.reject_agent_action('$ACT2', '$B') r"
 check "rejection is audit-logged" service "=t" "select exists (select 1 from public.audit_log where action = 'agent_action.rejected' and target_id = '$ACT2')"
 
+echo "Documents, chunks and workspace-scoped search"
+D1="$(value_as service "insert into public.documents (workspace_id, uploaded_by, file_path, file_name, mime_type, size_bytes, doc_type, content_text, parsed_status) values ('$W', '$B', '$W/doc-a/rectifiers.pdf', 'rectifiers.pdf', 'application/pdf', 10, 'pdf', 'Rectifier maintenance interval is six months.', 'ready') returning id")"
+D2="$(value_as service "insert into public.documents (workspace_id, uploaded_by, file_path, file_name, mime_type, size_bytes, doc_type, content_text, parsed_status) values ('$W', '$B', '$W/doc-b/battery.docx', 'battery.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 10, 'docx', 'Battery rectifier replacement policy.', 'ready') returning id")"
+D3="$(value_as service "insert into public.documents (workspace_id, uploaded_by, file_path, file_name, mime_type, size_bytes, doc_type, content_text, parsed_status) values ('$W2', '$C', '$W2/doc-c/other.pdf', 'other.pdf', 'application/pdf', 10, 'pdf', 'Rectifier notes in another workspace.', 'ready') returning id")"
+db -c "insert into public.chunks (document_id, workspace_id, chunk_index, content, char_start, char_end, section, context) values
+  ('$D1', '$W', 0, 'Rectifier maintenance interval is six months.', 0, 45, 'Maintenance', 'rectifiers.pdf > Maintenance'),
+  ('$D2', '$W', 0, 'Battery rectifier replacement policy.', 0, 37, 'Policy', 'battery.docx > Policy'),
+  ('$D3', '$W2', 0, 'Rectifier notes in another workspace.', 0, 37, '', 'other.pdf')" >/dev/null
+check "member keyword search finds both documents in the workspace" "$E" "=2" "select count(*) from public.match_chunks_sparse('$W', 'rectifier')"
+check "search never returns another workspace's chunks" "$E" "=0" "select count(*) from public.match_chunks_sparse('$W2', 'rectifier')"
+check "outsider searching this workspace gets nothing" "$C" "=0" "select count(*) from public.match_chunks_sparse('$W', 'rectifier')"
+check "document filter narrows the search" "$E" "=1" "select count(*) from public.match_chunks_sparse('$W', 'rectifier', 20, array['$D2']::uuid[])"
+check "section and context are searchable too" "$E" "=1" "select count(*) from public.match_chunks_sparse('$W', 'maintenance')"
+check "stopword-only query returns nothing instead of failing" "$E" "=0" "select count(*) from public.match_chunks_sparse('$W', 'the and of')"
+check "anonymous users cannot run search" anon fail "select * from public.match_chunks_sparse('$W', 'rectifier')"
+check "members cannot write chunks directly" "$E" fail "insert into public.chunks (document_id, workspace_id, chunk_index, content, char_start, char_end) values ('$D1', '$W', 9, 'x', 0, 1)"
+check "members read the extracted document text" "$E" "=45" "select length(content_text) from public.documents where id = '$D1'"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
