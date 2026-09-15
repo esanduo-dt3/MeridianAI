@@ -46,3 +46,60 @@ export interface AddMemberResult {
   member: Member | null
   invite: Invite | null
 }
+
+export type TaskStatus = 'todo' | 'in_progress' | 'done'
+export type Priority = 'none' | 'low' | 'medium' | 'high' | 'urgent'
+
+export interface Person {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+}
+
+export interface Task {
+  id: string
+  title: string
+  description: string
+  status: TaskStatus
+  priority: Priority
+  position: number
+  parent_task_id: string | null
+  due_date: string | null
+  source: 'manual' | 'agent'
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+  assignee: Person | null
+  created_by: Person | null
+}
+
+export interface Proposal {
+  id: string
+  reasoning: string
+  proposed_payload: {
+    title?: string
+    description?: string
+    priority?: Priority
+    due_date?: string
+    assignee_id?: string
+    parent_task_id?: string
+  }
+  created_at: string
+}
+
+export interface TaskBoard {
+  tasks: Task[]
+  proposals: Proposal[]
+}
+
+export interface TaskInput {
+  title?: string
+  description?: string
+  status?: TaskStatus
+  priority?: Priority
+  position?: number
+  due_date?: string | null
+  assignee_id?: string | null
+  parent_task_id?: string | null
+}
