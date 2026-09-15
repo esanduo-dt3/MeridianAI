@@ -21,8 +21,9 @@ psql_local -d meridian_test -f "$ROOT/supabase/tests/local-stubs.sql" >/dev/null
 
 for file in "$ROOT"/supabase/migrations/*.sql; do
   echo "applying $(basename "$file")"
-  sed -e 's/^create extension if not exists vector.*$//' \
-      -e 's/extensions\.vector([0-9]*)/float4[]/' \
+  sed -E -e 's/^create extension if not exists vector.*$//' \
+      -e 's/extensions\.vector(\([0-9]+\))?/float4[]/g' \
+      -e '/^set hnsw\./d' \
       -e '/using hnsw/d' -e '/chunk_embeddings_hnsw_idx/d' \
       "$file" | psql_local -d meridian_test --single-transaction >/dev/null
 done
