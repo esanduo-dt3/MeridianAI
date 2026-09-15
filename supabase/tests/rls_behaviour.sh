@@ -81,6 +81,8 @@ check "users cannot write agent actions directly" "$B" fail "insert into public.
 check "audit log rejects updates, even from the service role" service fail "update public.audit_log set action = 'tampered'"
 check "audit log rejects deletes" service fail "delete from public.audit_log"
 check "anonymous access is denied" anon fail "select * from public.tasks"
+check "users cannot look up accounts by email" "$A" fail "select public.find_user_id_by_email('bob@digitalt3.com')"
+check "service role looks up an account by email" service "=$B" "select public.find_user_id_by_email(' BOB@digitalt3.com ')"
 check "last admin cannot be removed" "$A" fail "delete from public.workspace_members where user_id = '$A' and workspace_id = '$W'"
 check "admin promotes a member" "$A" ok "update public.workspace_members set auth_role = 'Admin' where user_id = '$B' and workspace_id = '$W'"
 check "admin can leave once another admin exists" "$A" ok "delete from public.workspace_members where user_id = '$A' and workspace_id = '$W'"
