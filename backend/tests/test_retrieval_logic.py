@@ -1,6 +1,8 @@
 """Pure retrieval and answer logic: fusion, diversity, citations, confidence and
 the structural isolation of document content from model instructions."""
 
+import asyncio
+
 import pytest
 
 from app.rag import answer as answer_module
@@ -92,8 +94,6 @@ def test_generate_answer_sends_passages_only_as_user_turn_data(monkeypatch):
     attempt = Attempt(query="q", chunks=[chunk(1, 0.9, content=secret_passage, reasons=["instruction override"])], candidates=[], grade="good")
     result = RetrievalResult(question="What is the interval?", profile="lookup", attempts=[attempt], best=attempt, reranked=True)
 
-    import asyncio
-
     outcome = asyncio.run(answer_module.generate_answer("What is the interval?", result))
     assert outcome.answer == "Six months [1]." and outcome.citations[0].chunk.id == "c1"
     assert "injection_suspected_in_sources" in outcome.flag_reasons
@@ -132,3 +132,25 @@ def test_compose_answer_places_markers_from_sources_before_final_punctuation():
         ],
     }
     assert compose_answer(data) == "Rectifiers are inspected every six months [2][1]. Batteries last four years [3] No source here."
+
+
+def test_gateway_falls_back_to_the_fast_model_when_the_answer_model_fails():
+    from app.core.config import get_settings
+    from app.llm.gateway import ModelGateway
+
+    settings = get_settings()
+    calls: list[str] = []
+
+    class FlakyProvider:
+        async def generate(self, *, model, **_):
+            calls.append(model)
+            if model == settings.gemini_answer_model:
+                raise RuntimeError("504 DEADLINE_EXCEEDED")
+            return "ok"
+
+        async def embed(self, **_):
+            return []
+
+    result = asyncio.run(ModelGateway(FlakyProvider()).generate(system="s", parts=["p"]))
+    assert result.text == "ok" and result.model == settings.gemini_fast_model
+    assert calls == [settings.gemini_answer_model, settings.gemini_fast_model]

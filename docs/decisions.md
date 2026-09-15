@@ -396,3 +396,18 @@ Each of these closes a gap the UI or the guardrails need.
   - Grading, retry and groundedness all still exist, as the PRD's MUST scope requires.
   - `retrieval_runs.candidates_json` records each attempt's query, grade and note, so the pipeline health view and Gate G1 can show which path each question took.
   - The demo narration should describe the pipeline in this order.
+
+## D-031
+
+**Fall back to the fast model when the answer model is unavailable**
+
+- **Context.** During live testing on 2026-09-16, `gemini-3.5-flash` returned `504 DEADLINE_EXCEEDED` for every call while `gemini-3.5-flash-lite` answered in about a second. The gateway allowed 60 seconds per call and three attempts, so one question held the request open for minutes before failing.
+- **Decision.**
+  - Every model call has a hard 20-second deadline (`LLM_TIMEOUT_SECONDS`).
+  - The answer model gets one try. If it fails or times out, the same call goes to the fast model, with the normal three attempts.
+  - Calls that already use the fast model keep three attempts, with no fallback.
+  - Fallback answers are not cached under the answer model's key, so the next question tries the answer model again.
+- **Why.** A person waiting on an answer is better served by a slightly weaker model now than by an error after a minute. Citations, the groundedness check and the confidence label do not depend on which model wrote the answer.
+- **Consequences.**
+  - `agent_answers.model` records the model that actually answered, so fallbacks are visible in the review queue and in Gate G1 results.
+  - Golden-set runs should check that model column: a run answered mostly by the fast model is not a fair measure of the answer model.
