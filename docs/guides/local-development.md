@@ -27,8 +27,11 @@ cp backend/.env.example backend/.env
 | | `SUPABASE_PUBLISHABLE_KEY` | Same as above |
 | | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API Keys → service role |
 | | `DATABASE_URL` | Supabase → **Connect** → Session pooler connection string, with the database password filled in |
-| | `GEMINI_API_KEY` | Google AI Studio (needed from the retrieval work onward) |
+| | `GEMINI_API_KEY` | Google AI Studio → Get API key. The free tier works; see the note below |
+| | `VOYAGE_API_KEY` | [dash.voyageai.com](https://dash.voyageai.com) → API Keys. Without it, answers have no reranker score and confidence shows as unavailable |
 | | `FRONTEND_ORIGIN` | `http://localhost:5173` |
+
+**Gemini free tier.** Free keys have small per-model daily request limits (20 a day for `gemini-3.5-flash` when this was written; see [ai.dev/rate-limit](https://ai.dev/rate-limit) for your project). One question makes one to four model calls. The gateway moves to the next model in its chain when a model is out of quota or times out ([D-032](../decisions.md#d-032)), so a long testing session keeps working but answers may come from a lighter model. The `model` field on each answer shows which one.
 
 ## 2. One-time Google sign-in setup
 
