@@ -1,0 +1,101 @@
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
+@import '@fontsource-variable/bricolage-grotesque';
+@import 'tailwindcss';
+
+/*
+  Meridian design tokens.
+  Direction: a survey instrument, not a chat toy. Cool mineral paper, black ink,
+  one cobalt accent for action and location, and a highlighter wash reserved
+  exclusively for cited source passages.
+*/
+@theme {
+  --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-paper: #f4f5f2;
+  --color-surface: #ffffff;
+  --color-sunken: #eceee9;
+  --color-ink: #111418;
+  --color-ink-2: #454d57;
+  --color-ink-3: #69717b;
+  --color-rule: #e1e4df;
+  --color-rule-strong: #c9cec8;
+
+  --color-cobalt: #2743c9;
+  --color-cobalt-hover: #1f37a8;
+  --color-cobalt-wash: #eaedfb;
+
+  /* Reserved for citations: the passage an answer actually used. */
+  --color-mark: #ffe27a;
+  --color-mark-edge: #e7c23a;
+
+  --color-grounded: #16704a;
+  --color-grounded-wash: #e5f1ea;
+  --color-flag: #9a4e00;
+  --color-flag-wash: #fbefe1;
+  --color-danger: #b42318;
+  --color-danger-wash: #fdecea;
+
+  --radius-control: 8px;
+  --radius-panel: 12px;
+
+  --shadow-panel: 0 1px 0 rgb(17 20 24 / 0.04), 0 8px 24px -12px rgb(39 67 201 / 0.12);
+  --shadow-lift: 0 1px 0 rgb(17 20 24 / 0.05), 0 18px 40px -18px rgb(17 20 24 / 0.22);
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--color-cobalt-wash);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-cobalt);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
+  }
+}
+
+@keyframes meridian-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
