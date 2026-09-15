@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     gemini_thinking_level: str = "minimal"
     gemini_embed_model: str = "gemini-embedding-001"
     embed_dim: int = 1536                                # must match chunk_embeddings.embedding
-    llm_timeout_seconds: float = 60.0
+    # A hard deadline per model call. A slow or overloaded answer model falls
+    # back to the fast model instead of holding the request open (D-031).
+    llm_timeout_seconds: float = 20.0
     response_cache_entries: int = 512                    # in-process cache of identical model calls
 
     # --- Reranking ---

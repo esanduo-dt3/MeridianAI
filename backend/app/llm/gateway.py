@@ -148,15 +148,16 @@ class ModelGateway:
         self._responses = _LRU(settings.response_cache_entries)
         self._embeddings = _LRU(settings.response_cache_entries * 4)
 
-    async def _with_retry(self, label: str, call):
+    async def _with_retry(self, label: str, call, attempts: int = 3):
         delay = 0.8
-        for attempt in range(3):
+        timeout = self._settings.llm_timeout_seconds
+        for attempt in range(attempts):
             try:
-                return await call()
+                return await asyncio.wait_for(call(), timeout)
             except Exception as exc:  # noqa: BLE001 - provider errors vary by SDK version
-                if attempt == 2:
-                    log.warning("%s failed after retries", label, exc_info=True)
-                    raise ModelError(f"{label} failed: {exc}") from exc
+                if attempt == attempts - 1:
+                    log.warning("%s failed after %d attempt(s): %r", label, attempts, exc)
+                    raise ModelError(f"{label} failed: {exc!r}") from exc
                 await asyncio.sleep(delay)
                 delay *= 2
 
@@ -170,19 +171,30 @@ class ModelGateway:
         temperature: float = 0.2,
         json_schema: dict | None = None,
     ) -> Generation:
-        model = self._settings.gemini_fast_model if fast else self._settings.gemini_answer_model
-        key = _key("generate", model, system, parts, max_tokens, temperature, json_schema)
+        primary = self._settings.gemini_fast_model if fast else self._settings.gemini_answer_model
+        fallback = self._settings.gemini_fast_model if primary != self._settings.gemini_fast_model else None
+        key = _key("generate", primary, system, parts, max_tokens, temperature, json_schema)
         cached = self._responses.get(key)
         if cached is not None:
-            return Generation(text=cached, model=model, cached=True)
-        text = await self._with_retry(
-            f"generate:{model}",
-            lambda: self._provider.generate(
+            return Generation(text=cached, model=primary, cached=True)
+
+        def call(model: str):
+            return lambda: self._provider.generate(
                 model=model, system=system, parts=parts, max_tokens=max_tokens, temperature=temperature, json_schema=json_schema
-            ),
-        )
+            )
+
+        try:
+            # With a fallback available, one try is enough: an overloaded model
+            # rarely recovers within the seconds a person is waiting.
+            text = await self._with_retry(f"generate:{primary}", call(primary), attempts=1 if fallback else 3)
+        except ModelError:
+            if fallback is None:
+                raise
+            log.warning("generate:%s unavailable, falling back to %s", primary, fallback)
+            text = await self._with_retry(f"generate:{fallback}", call(fallback))
+            return Generation(text=text, model=fallback)
         self._responses.put(key, text)
-        return Generation(text=text, model=model)
+        return Generation(text=text, model=primary)
 
     async def embed(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
         if not texts:

@@ -49,14 +49,41 @@ Errors return `{"detail": "<message>"}`.
 | `POST /notes` | Workspace | Any | Body `{title?, content?}`; content must be a `doc` block tree ([D-029](../decisions.md#d-029)). Starts with an empty paragraph |
 | `PATCH /notes/{id}` | Workspace | Any | Body `{title?, content?}`. 422 for flat or invalid content |
 | `DELETE /notes/{id}` | Workspace | Author or Admin | 404 when the note does not exist or the caller may not delete it |
+| `POST /agent/ask` | Workspace | Any | Body `{question, document_ids?, profile?}`. Returns the answer, citations, confidence, groundedness, flags and a retrieval summary (below) |
+| `GET /agent/answers` | Workspace | Any | The caller's 30 most recent answers in this workspace |
 
 "Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
+
+### `POST /agent/ask` response
+
+```json
+{
+  "answer_id": "uuid",
+  "question": "What is the rectifier inspection interval?",
+  "answer": "Six months after the firmware upgrade [1].",
+  "answerable": true,
+  "citations": [
+    { "ordinal": 1, "chunk_id": "uuid", "document_id": "uuid", "file_name": "policy.docx",
+      "char_start": 120, "char_end": 318, "page": 2, "section": "Policy > Intervals", "excerpt": "..." }
+  ],
+  "confidence": { "value": 0.71, "label": "uncalibrated", "basis": "Mean reranker relevance ..." },
+  "grounded": true,
+  "flagged": false,
+  "flag_reasons": [],
+  "retrieval": { "run_id": "uuid", "attempts": 1, "grade": "good", "final_query": "...",
+                 "top_score": 0.83, "reranked": true, "latency_ms": 2840 },
+  "model": "gemini-3.5-flash"
+}
+```
+
+- **Offsets.** `char_start` and `char_end` index into the document's `content_text` (from `GET /documents/{id}`), counted in Unicode code points ([D-023](../decisions.md#d-023)).
+- **Confidence.** It is never shown without its `label` ([D-027](../decisions.md#d-027)). `value` is `null` when no reranker score was available.
+- **Errors.** 503 when the model provider is unavailable.
 
 ## Planned (MUST scope)
 
 | Method and path | Role | Purpose |
 | --- | --- | --- |
-| `POST /agent/ask` | Member | Ask a grounded question |
 | `GET /admin/review-queue` | Admin | Flagged answers and pending actions |
 | `POST /admin/reviews/{target_type}/{target_id}` | Admin | Record a review decision |
 | `GET /admin/audit-log` | Admin | Audit trail |

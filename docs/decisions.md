@@ -33,7 +33,11 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-024](#d-024) | PyMuPDF for PDF parsing, licence flagged | Accepted | Owner | 2026-09-16 |
 | [D-025](#d-025) | The workspace is the search namespace | Accepted | Owner | 2026-09-16 |
 | [D-026](#d-026) | Gemini behind a provider gateway, Voyage for reranking | Accepted | Owner | 2026-09-16 |
+| [D-027](#d-027) | Confidence formula and review flags | Accepted | Engineering | 2026-09-16 |
+| [D-028](#d-028) | LangChain, not LangGraph, for the agent | Accepted | Owner | 2026-09-16 |
 | [D-029](#d-029) | Block note editor on Tiptap, stored as its JSON tree | Accepted | Engineering | 2026-09-16 |
+| [D-030](#d-030) | Rewrite and grade only when retrieval is uncertain | Accepted | Owner | 2026-09-16 |
+| [D-031](#d-031) | Fall back to the fast model when the answer model is unavailable | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -348,6 +352,31 @@ Each of these closes a gap the UI or the guardrails need.
   - Without Voyage, retrieval falls back to fusion order plus an LLM grade, and confidence is reported as unavailable.
   - The response cache is per process. A shared cache for demo pre-warming is Day 5 work.
 
+## D-027
+
+**Confidence formula and review flags**
+
+- **Context.** The PRD defines confidence as a combination of the reranker score and the grading verdict, stated and uncalibrated.
+- **Decision.**
+  - **Formula:** `confidence = mean(rerank score of the cited passages) × (1.0 if the retrieval grade is good, else 0.6)`, rounded to 3 decimals.
+  - **Returned with:** `label: "uncalibrated"` and a plain-language basis.
+  - **Flag reasons.** An answer is flagged for the admin review queue when any of these apply:
+    - confidence below 0.35 (`review_confidence_threshold`);
+    - the groundedness check fails;
+    - an answerable reply has no valid citations;
+    - the documents cannot answer the question;
+    - a retrieved passage matched an injection pattern.
+- **Consequences.** Every flag reason is stored on `agent_answers.flag_reasons`, so the review queue can explain why an answer is there. The threshold is configuration and should be revisited once Gate G1 results exist.
+
+## D-028
+
+**LangChain, not LangGraph, for the agent**
+
+- **Context.** The PRD and kickoff prompt name LangGraph for agent orchestration.
+- **Decision.** The owner chose plain LangChain for the Week 1 agent, and will present the rationale.
+  - The agent's job is small: search the workspace, read tasks, and propose a task that is held for approval. A single tool-calling loop covers it.
+  - The retrieval loop (search, assess, rewrite once, retry) is plain Python with no orchestration framework.
+- **Consequences.** No graph state or checkpointer. Approval is handled by `agent_actions` rows and the atomic approve and reject functions ([D-009](#d-009)), not by pausing an agent.
 
 ## D-029
 
@@ -361,3 +390,39 @@ Each of these closes a gap the UI or the guardrails need.
   - Editing autosaves after a 700 ms pause, and flushes pending changes when the note closes or the tab is hidden.
   - The API uses `POST /notes` to create and `PATCH /notes/{id}` to update, in place of the PRD's single `POST /notes`.
 - **Why.** ProseMirror's document model is already a typed block tree, so storing its JSON satisfies the requirement with no conversion layer, and the agent can walk it on Day 4 to propose tasks from a note.
+
+## D-030
+
+**Rewrite and grade only when retrieval is uncertain**
+
+- **Context.** PRD section 7.1 describes the pipeline as: rewrite the query, run hybrid retrieval, rerank, grade relevance, retry if weak, then check groundedness. Taken literally, that is two model calls before every search. Section 14 warns the full pipeline risks 10 to 20 seconds against a p50 target under 8 seconds.
+- **Decision.** The owner chose this order:
+  1. The first attempt searches with the user's own question, with no rewrite.
+  2. Hybrid search, then the cross-encoder rerank, then MMR.
+  3. The reranker's top score is the first grade:
+     - at or above 0.50 counts as good, with no model call;
+     - below 0.22 counts as weak;
+     - only the band in between is graded by the fast model.
+  4. A weak result triggers one query rewrite and a second attempt (two attempts at most), and the better attempt is used.
+  5. The groundedness check always runs.
+  6. The agent never asks the user a clarifying question.
+- **Why.** Embeddings handle natural-language questions well, so a rewrite mainly helps a failed first attempt. The cross-encoder has already read the question and each passage together, so its score is a better and free relevance signal than an extra model call in the clear cases. The common path makes zero model calls before answer generation, which protects the latency budget without cutting the retry loop.
+- **Consequences.**
+  - Grading, retry and groundedness all still exist, as the PRD's MUST scope requires.
+  - `retrieval_runs.candidates_json` records each attempt's query, grade and note, so the pipeline health view and Gate G1 can show which path each question took.
+  - The demo narration should describe the pipeline in this order.
+
+## D-031
+
+**Fall back to the fast model when the answer model is unavailable**
+
+- **Context.** During live testing on 2026-09-16, `gemini-3.5-flash` returned `504 DEADLINE_EXCEEDED` for every call while `gemini-3.5-flash-lite` answered in about a second. The gateway allowed 60 seconds per call and three attempts, so one question held the request open for minutes before failing.
+- **Decision.**
+  - Every model call has a hard 20-second deadline (`LLM_TIMEOUT_SECONDS`).
+  - The answer model gets one try. If it fails or times out, the same call goes to the fast model, with the normal three attempts.
+  - Calls that already use the fast model keep three attempts, with no fallback.
+  - Fallback answers are not cached under the answer model's key, so the next question tries the answer model again.
+- **Why.** A person waiting on an answer is better served by a slightly weaker model now than by an error after a minute. Citations, the groundedness check and the confidence label do not depend on which model wrote the answer.
+- **Consequences.**
+  - `agent_answers.model` records the model that actually answered, so fallbacks are visible in the review queue and in Gate G1 results.
+  - Golden-set runs should check that model column: a run answered mostly by the fast model is not a fair measure of the answer model.
