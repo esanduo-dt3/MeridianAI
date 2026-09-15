@@ -39,6 +39,11 @@ Errors return `{"detail": "<message>"}`.
 | `DELETE /tasks/{id}` | Workspace | Admin | Deletes the task and its subtasks |
 | `POST /agent/actions/{id}/approve` | Workspace | Admin | Writes the proposed task (`source: "agent"`), records the decision and audit entry atomically. 409 if already decided |
 | `POST /agent/actions/{id}/reject` | Workspace | Admin | Records the rejection and audit entry; writes no task. 409 if already decided |
+| `GET /documents` | Workspace | Any | Documents with status (`pending`, `processing`, `ready`, `failed`), parse error, page and chunk counts, parse stats, uploader |
+| `GET /documents/{id}` | Workspace | Any | The document plus `content_text` and every chunk's `char_start`, `char_end`, page, section, kind and token count |
+| `POST /documents/upload` | Workspace | Admin | Multipart `file` (PDF or DOCX, ≤ 25 MB). Returns 202 with `parsed_status: "pending"`; processing continues in the background. 409 duplicate, 413 too large, 415 unsupported type |
+| `POST /documents/{id}/reprocess` | Workspace | Admin | Re-runs parsing and embedding. 409 while already processing |
+| `DELETE /documents/{id}` | Workspace | Admin | Deletes the document, its chunks, embeddings and stored file |
 
 "Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
 
@@ -46,7 +51,6 @@ Errors return `{"detail": "<message>"}`.
 
 | Method and path | Role | Purpose |
 | --- | --- | --- |
-| `POST /documents/upload` | Admin | Upload and parse a document |
 | `POST /notes` | Member | Create or update a note |
 | `POST /agent/ask` | Member | Ask a grounded question |
 | `GET /admin/review-queue` | Admin | Flagged answers and pending actions |
