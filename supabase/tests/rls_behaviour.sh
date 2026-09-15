@@ -97,6 +97,33 @@ check "outsider cannot upload a file" "$C" fail "insert into storage.objects (bu
 check "member lists workspace files" "$E" "=1" "select count(*) from storage.objects"
 check "outsider lists no files" "$C" "=0" "select count(*) from storage.objects"
 
+echo "Subtasks, ordering and agent proposals"
+W2="$(value_as "$C" "select id from public.create_workspace('Carol Space')")"
+C_TASK="$(value_as "$C" "insert into public.tasks (workspace_id, title, created_by) values ('$W2', 'Carol task', '$C') returning id")"
+SUB="$(value_as "$B" "insert into public.tasks (workspace_id, title, created_by, parent_task_id) values ('$W', 'Subtask', '$B', '$T') returning id")"
+check "admin creates a subtask" "$B" "=$T" "select parent_task_id from public.tasks where id = '$SUB'"
+check "subtask cannot point at another workspace's task" service fail "insert into public.tasks (workspace_id, title, created_by, parent_task_id) values ('$W', 'Cross', '$B', '$C_TASK')"
+check "a task cannot move under its own subtask" service fail "update public.tasks set parent_task_id = '$SUB' where id = '$T'"
+check "a task cannot be its own parent" service fail "update public.tasks set parent_task_id = id where id = '$T'"
+check "member reorders a task" "$E" "=42" "update public.tasks set position = 42 where id = '$T' returning position"
+check "member cannot change priority" "$E" fail "update public.tasks set priority = 'urgent' where id = '$T'"
+check "member cannot re-parent a task" "$E" fail "update public.tasks set parent_task_id = null where id = '$SUB'"
+check "done sets completed_at" "$E" "=t" "update public.tasks set status = 'done' where id = '$SUB' returning completed_at is not null"
+check "reopening clears completed_at" "$E" "=t" "update public.tasks set status = 'todo' where id = '$SUB' returning completed_at is null"
+db -c "delete from public.tasks where id = '$T'" >/dev/null
+check "deleting a parent removes its subtasks" service "=0" "select count(*) from public.tasks where id = '$SUB'"
+
+ACT="$(value_as service "insert into public.agent_actions (workspace_id, action_type, target_table, proposed_payload, reasoning) values ('$W', 'create_task', 'tasks', '{\"title\": \"Draft the Q3 plan\", \"priority\": \"high\"}', 'The kickoff note lists a Q3 plan with no owner') returning id")"
+ACT2="$(value_as service "insert into public.agent_actions (workspace_id, action_type, target_table, proposed_payload, reasoning) values ('$W', 'create_task', 'tasks', '{\"title\": \"Unwanted\"}', 'Guessing') returning id")"
+check "users cannot call approve directly" "$B" fail "select public.approve_agent_action('$ACT', '$B')"
+check "approve refuses a non-admin approver" service fail "select public.approve_agent_action('$ACT', '$E')"
+check "admin approval writes the task as an agent task" service "=agent|high|Draft the Q3 plan" "select source || '|' || priority || '|' || title from public.approve_agent_action('$ACT', '$B')"
+check "approval records the decision and target" service "=approved|true" "select status || '|' || (target_id is not null) from public.agent_actions where id = '$ACT'"
+check "approval is audit-logged with reasoning" service "=t" "select exists (select 1 from public.audit_log where action = 'agent_action.approved' and details ->> 'reasoning' like 'The kickoff note%')"
+check "a proposal cannot be approved twice" service fail "select public.approve_agent_action('$ACT', '$B')"
+check "rejection writes no task" service "=rejected|0" "select r.status || '|' || (select count(*) from public.tasks where title = 'Unwanted') from public.reject_agent_action('$ACT2', '$B') r"
+check "rejection is audit-logged" service "=t" "select exists (select 1 from public.audit_log where action = 'agent_action.rejected' and target_id = '$ACT2')"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

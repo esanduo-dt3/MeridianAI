@@ -11,6 +11,23 @@ Newest first. Each entry states what exists, how it was verified, and what is bl
 
 ## Day 1 (2026-09-15)
 
+### Part 6: Tasks, List and Board views (committed on `feature/tasks`)
+
+- **Built.**
+  - **Database:** subtasks, priority, description, ordering and completion time; loop and cross-workspace protection; atomic `approve_agent_action` and `reject_agent_action`.
+  - **API:** list, create, update, delete tasks; approve and reject proposals.
+  - **List view:** collapsible subtask tree, progress bars, overdue dates, priority bars, assignee avatars, filter (`/`), Show completed, inline add (`N`).
+  - **Board view:** To do, In progress and Done columns with drag and drop by pointer or keyboard, and per-column add.
+  - **Task panel:** edit every field, subtasks, delete with confirmation. Members get a read-only panel apart from status.
+  - **Proposals:** agent proposals with the agent's reasoning, Approve and Reject for Admins, and an Agent badge on approved tasks.
+- **Verified.**
+  - Database access suite: 56 passed.
+  - `pytest`: 30 passed.
+  - Live API run: 20 passed.
+  - Browser run (Admin, Member, light and dark, mobile, pointer and keyboard drag): 25 passed.
+- **Bug found and fixed during testing.** Cross-column drops failed once a column was taller than the screen: corner-distance collision detection preferred cards in the starting column. The board now uses what is under the pointer first.
+- **Not yet merged or pushed.** Waiting for owner approval.
+
 ### Part 5: Workspaces and members (committed on `feature/workspaces`)
 
 - **Built.**

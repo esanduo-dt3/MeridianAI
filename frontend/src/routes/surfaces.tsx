@@ -8,7 +8,6 @@ import { Link } from 'react-router-dom'
 import {
   ArrowRight,
   ChatTeardropText,
-  CheckSquareOffset,
   Files,
   ListMagnifyingGlass,
   NotePencil,
@@ -78,22 +77,6 @@ export function DocumentsPage() {
       />
       <EmptyState icon={Files} title="No documents yet">
         Uploaded files appear here with their processing status, so you can see when a document is ready to ask about.
-      </EmptyState>
-    </Page>
-  )
-}
-
-export function TasksPage() {
-  return (
-    <Page>
-      <PageHeader
-        title="Tasks"
-        status="not-built"
-        description="Tasks you've approved, and tasks the agent has proposed that are waiting for your decision."
-      />
-      <EmptyState icon={CheckSquareOffset} title="No tasks yet">
-        When the agent proposes a task, it waits here with its reasoning. Nothing is added to the workspace until you
-        approve it.
       </EmptyState>
     </Page>
   )

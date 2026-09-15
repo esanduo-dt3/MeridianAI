@@ -26,6 +26,8 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-017](#d-017) | Light and dark themes with a system default | Accepted | Owner | 2026-09-15 |
 | [D-018](#d-018) | API queries run as the signed-in user; service role only where required | Accepted | Engineering | 2026-09-15 |
 | [D-019](#d-019) | Frontend data and interaction libraries | Accepted | Engineering | 2026-09-15 |
+| [D-020](#d-020) | Task List and Board views with subtasks | Accepted | Owner | 2026-09-15 |
+| [D-021](#d-021) | Members may reorder tasks as well as change status | Accepted | Engineering | 2026-09-15 |
 
 ---
 
@@ -246,3 +248,31 @@ Each of these closes a gap the UI or the guardrails need.
   - **Sonner:** transient confirmation toasts.
   - **@dnd-kit:** drag and drop on the task board (added with the task views).
 - **Why.** Accessible modals, menus and drag-and-drop are costly to get right by hand. These libraries are unstyled or lightly styled, so the design system stays in control.
+
+## D-020
+
+**Task List and Board views with subtasks**
+
+- **Context.** The PRD's MUST scope asks for a task list that shows approved tasks and agent proposals awaiting approval. The backlog and sprint board is SHOULD scope. The owner asked for a List view and a Kanban board modelled on a reference screenshot, before the retrieval work.
+- **Decision.**
+  - **Data model.** Tasks gain `description`, `priority` (none, low, medium, high, urgent), `parent_task_id` for subtasks, `position` for ordering, `updated_at` and `completed_at`.
+  - **List view.** A collapsible tree with subtask progress, due dates (overdue highlighted), priority and assignee.
+  - **Board view.** Three status columns (To do, In progress, Done) with pointer and keyboard drag and drop.
+  - **Task panel.** Edits every field and manages subtasks.
+  - **Agent proposals.** Shown above both views, with Approve and Reject for Admins ([D-009](#d-009), non-negotiable 1).
+- **Scope note.**
+  - This is an owner-requested addition to the MUST scope.
+  - There are no sprints: [D-010](#d-010) still stands, and `sprint_id` stays unused.
+  - There is no automatic assignment and no undo; both remain SHOULD scope.
+- **Consequences.**
+  - Subtask trees are validated in the database: same workspace, no loops.
+  - Deleting a task deletes its subtasks.
+  - Projects inside workspaces were considered and deferred by the owner.
+
+## D-021
+
+**Members may reorder tasks as well as change status**
+
+- **Context.** [D-006](#d-006) limits Members to changing a task's status. On a board, moving a card between columns changes both status and position.
+- **Decision.** Members may change `status` and `position`, and nothing else. This is enforced by the API (403) and by the `tasks_member_update_guard` trigger.
+- **Why.** Ordering carries no content. Without it, a Member could move a card to another column but not place it where they dropped it.

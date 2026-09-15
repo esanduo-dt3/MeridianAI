@@ -134,6 +134,13 @@
   }
 }
 
+@keyframes meridian-slide {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
 @keyframes meridian-scan {
   from {
     transform: translateX(-100%);

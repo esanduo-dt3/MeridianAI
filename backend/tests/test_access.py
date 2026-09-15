@@ -22,6 +22,10 @@ ADMIN_ONLY = [
     ("delete", "/admin/members/00000000-0000-0000-0000-000000000009", None),
     ("delete", "/admin/invites/00000000-0000-0000-0000-000000000009", None),
     ("patch", "/workspace", {"name": "Renamed"}),
+    ("post", "/tasks", {"title": "New task"}),
+    ("delete", "/tasks/00000000-0000-0000-0000-000000000009", None),
+    ("post", "/agent/actions/00000000-0000-0000-0000-000000000009/approve", None),
+    ("post", "/agent/actions/00000000-0000-0000-0000-000000000009/reject", None),
 ]
 
 
@@ -45,4 +49,25 @@ def test_workspace_header_must_be_a_uuid(client):
 
     app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id="u", email=None, token="t")
     response = client.get("/members", headers={"X-Workspace-Id": "not-a-uuid"})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{"title": "Renamed"}, {"priority": "urgent"}, {"assignee_id": None}, {"status": "done", "due_date": "2026-10-01"}],
+)
+def test_members_can_only_change_status_and_order(client, as_member, body):
+    response = client.patch("/tasks/00000000-0000-0000-0000-000000000009", json=body, headers=WORKSPACE)
+    assert response.status_code == 403
+    assert "status and order" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("body", [{}, {"status": "blocked"}, {"priority": "critical"}, {"position": "NaN"}])
+def test_invalid_task_updates_are_rejected(client, as_admin, body):
+    response = client.patch("/tasks/00000000-0000-0000-0000-000000000009", json=body, headers=WORKSPACE)
+    assert response.status_code == 422
+
+
+def test_blank_task_title_is_rejected(client, as_admin):
+    response = client.post("/tasks", json={"title": "   "}, headers=WORKSPACE)
     assert response.status_code == 422

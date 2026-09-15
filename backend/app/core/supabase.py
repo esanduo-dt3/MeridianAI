@@ -27,6 +27,8 @@ _PG_STATUS = {
     "23514": status.HTTP_409_CONFLICT,  # check violation (e.g. last Admin)
     "23503": status.HTTP_422_UNPROCESSABLE_ENTITY,  # foreign key violation
     "22P02": status.HTTP_422_UNPROCESSABLE_ENTITY,  # invalid input (e.g. bad uuid)
+    "22023": status.HTTP_422_UNPROCESSABLE_ENTITY,  # invalid parameter value
+    "P0002": status.HTTP_404_NOT_FOUND,  # raised "not found"
 }
 
 

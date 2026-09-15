@@ -19,8 +19,8 @@ Roles belong to a person **within a workspace**, stored on `workspace_members.au
 | Ask the agent and read cited answers | ✓ | ✓ | – |
 | Create and edit notes | ✓ | ✓ | – |
 | Delete a note | ✓ | Own notes | – |
-| Change a task's status | ✓ | ✓ | – |
-| Create a task, or edit its title, assignee or due date | ✓ | – | – |
+| Change a task's status, or reorder it on the board | ✓ | ✓ | – |
+| Create a task or subtask, or edit its title, description, priority, assignee or due date | ✓ | – | – |
 | Delete a task | ✓ | – | – |
 | Upload or delete documents | ✓ | – | – |
 | See agent-proposed tasks | ✓ | ✓ | – |
@@ -39,9 +39,9 @@ The backend checks the role before every action. The database enforces the same 
 | --- | --- | --- |
 | Only members can read a workspace | `get_workspace_context` | RLS `*: members read` policies |
 | Admin-only actions | `require_admin` | RLS `admins …` policies |
-| Members change task status only | Endpoint validation | `tasks_member_update_guard` trigger |
-| Agent writes need approval | Approve endpoint (Admin) | Users cannot write `agent_actions`; tasks from the agent are written only by the service role |
+| Members change task status and order only | `PATCH /tasks` rejects other fields (403) | `tasks_member_update_guard` trigger |
+| Agent writes need approval | Approve and reject endpoints (Admin) | Users cannot write `agent_actions`; `approve_agent_action` re-checks Admin and is service-role only |
 | Audit log cannot be altered | No update or delete paths | `audit_log_no_update` trigger, for every role |
 | Last Admin stays | Endpoint validation | `workspace_members_keep_one_admin` trigger |
 
-These rules are exercised by `supabase/tests/rls_behaviour.sh` (36 checks). See [guides/database.md](../guides/database.md#testing-access-rules).
+These rules are exercised by `supabase/tests/rls_behaviour.sh` (56 checks). See [guides/database.md](../guides/database.md#testing-access-rules).
