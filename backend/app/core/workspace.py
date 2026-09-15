@@ -1,20 +1,20 @@
 """Workspace scoping.
 
-Every protected route depends on get_workspace_context, so a handler cannot run
-without a resolved workspace and the caller's role in it. Roles live on
-workspace_members, never on the user.
+Every workspace-scoped route depends on get_workspace_context, so a handler
+cannot run without a resolved workspace and the caller's role in it. Roles live
+on workspace_members, never on the user (docs/decisions.md D-006).
 """
 
 from dataclasses import dataclass
 from typing import Literal
+from uuid import UUID
 
-import httpx
 from fastapi import Depends, Header, HTTPException, status
 
 from app.core.security import AuthenticatedUser, get_current_user
-from app.core.supabase import service_client
+from app.core.supabase import Db, user_db
 
-AuthRole = Literal["Member", "Admin"]
+AuthRole = Literal["Admin", "Member"]
 
 
 @dataclass(frozen=True)
@@ -25,31 +25,29 @@ class WorkspaceContext:
     workspace_name: str
     auth_role: AuthRole
 
+    @property
+    def is_admin(self) -> bool:
+        return self.auth_role == "Admin"
+
 
 async def get_workspace_context(
+    x_workspace_id: UUID | None = Header(default=None),
     user: AuthenticatedUser = Depends(get_current_user),
-    x_workspace_id: str | None = Header(default=None),
-    db: httpx.AsyncClient = Depends(service_client),
+    db: Db = Depends(user_db),
 ) -> WorkspaceContext:
-    params = {
-        "select": "workspace_id,auth_role,workspaces(name)",
-        "user_id": f"eq.{user.id}",
-        "order": "joined_at.asc",
-        "limit": "1",
-    }
-    if x_workspace_id:
-        params["workspace_id"] = f"eq.{x_workspace_id}"
+    if x_workspace_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "X-Workspace-Id header is required")
 
-    try:
-        response = await db.get("/workspace_members", params=params)
-    except httpx.HTTPError as exc:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Workspace lookup is unavailable") from exc
-
-    if response.status_code != 200:
-        # e.g. the schema has not been migrated yet. Never fall back to an unscoped request.
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Workspace lookup failed")
-
-    rows = response.json()
+    # Queried with the caller's own token, so row-level security applies as well.
+    rows = await db.select(
+        "workspace_members",
+        {
+            "select": "auth_role,workspaces(name)",
+            "user_id": f"eq.{user.id}",
+            "workspace_id": f"eq.{x_workspace_id}",
+            "limit": "1",
+        },
+    )
     if not rows:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not a member of this workspace")
 
@@ -57,13 +55,13 @@ async def get_workspace_context(
     return WorkspaceContext(
         user_id=user.id,
         email=user.email,
-        workspace_id=row["workspace_id"],
+        workspace_id=str(x_workspace_id),
         workspace_name=(row.get("workspaces") or {}).get("name", ""),
         auth_role=row["auth_role"],
     )
 
 
 def require_admin(context: WorkspaceContext = Depends(get_workspace_context)) -> WorkspaceContext:
-    if context.auth_role != "Admin":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin role required in this workspace")
+    if not context.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Admins of this workspace can do this")
     return context

@@ -1,25 +1,28 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.workspace import AuthRole, WorkspaceContext, get_workspace_context
+from app.api.workspaces import WorkspaceSummary, list_my_workspaces
+from app.core.security import AuthenticatedUser, get_current_user
+from app.core.supabase import Db, user_db
 
 router = APIRouter(tags=["me"])
 
 
-class MeResponse(BaseModel):
-    user_id: str
+class Profile(BaseModel):
+    id: str
     email: str | None
-    workspace_id: str
-    workspace_name: str
-    auth_role: AuthRole
+    full_name: str | None = None
+    avatar_url: str | None = None
+
+
+class MeResponse(BaseModel):
+    user: Profile
+    workspaces: list[WorkspaceSummary]
 
 
 @router.get("/me", response_model=MeResponse)
-async def me(context: WorkspaceContext = Depends(get_workspace_context)) -> MeResponse:
-    return MeResponse(
-        user_id=context.user_id,
-        email=context.email,
-        workspace_id=context.workspace_id,
-        workspace_name=context.workspace_name,
-        auth_role=context.auth_role,
-    )
+async def me(user: AuthenticatedUser = Depends(get_current_user), db: Db = Depends(user_db)) -> MeResponse:
+    rows = await db.select("users", {"select": "id,email,full_name,avatar_url", "id": f"eq.{user.id}"})
+    # The profile row is created by the sign-up trigger; fall back to token claims if it is missing.
+    profile = Profile(**rows[0]) if rows else Profile(id=user.id, email=user.email)
+    return MeResponse(user=profile, workspaces=await list_my_workspaces(user.id, db))
