@@ -24,6 +24,8 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-015](#d-015) | Plain SQL migrations applied with psql, tested locally | Accepted | Engineering | 2026-09-15 |
 | [D-016](#d-016) | Visual direction for the product UI | Accepted | Engineering | 2026-09-15 |
 | [D-017](#d-017) | Light and dark themes with a system default | Accepted | Owner | 2026-09-15 |
+| [D-018](#d-018) | API queries run as the signed-in user; service role only where required | Accepted | Engineering | 2026-09-15 |
+| [D-019](#d-019) | Frontend data and interaction libraries | Accepted | Engineering | 2026-09-15 |
 
 ---
 
@@ -219,3 +221,28 @@ Each of these closes a gap the UI or the guardrails need.
   - A three-way control (System, Light, Dark) is in the sidebar and on the sign-in page, and the choice is stored locally in the browser.
   - The theme is applied before the first paint, so there is no flash of the wrong theme.
 - **Consequences.** Components must use theme tokens only. Colours are chosen to keep text at WCAG AA contrast in both themes. See [design/design-system.md](design/design-system.md#dark-theme).
+
+## D-018
+
+**API queries run as the signed-in user; service role only where required**
+
+- **Context.** [D-013](#d-013) had the backend use the service-role key after its own role check. That makes the application code the only barrier, and leaves the tested row-level security policies unused by the API.
+- **Decision.**
+  - Handlers call PostgREST with the publishable key plus the **caller's own access token**, so every read and write is filtered by row-level security in addition to the API's role checks.
+  - The service-role client is used only for:
+    - writing `audit_log` entries, which users may not write;
+    - `find_user_id_by_email`, which crosses workspaces and must not be callable by users;
+    - agent writes after approval, when those land.
+  - Database errors are mapped to HTTP responses. For example, violating the last-Admin rule returns 409, and a row-level security rejection returns 403.
+- **Consequences.** A bug in an API role check cannot expose another workspace's data. This supersedes the "service role after role check" part of D-013 for user-initiated requests.
+
+## D-019
+
+**Frontend data and interaction libraries**
+
+- **Decision.** Add four libraries:
+  - **TanStack Query:** server state, caching, retries and invalidation. Workspace-scoped query keys start with `['ws', workspaceId]`, so switching workspace discards stale data.
+  - **Radix UI Dialog and Dropdown Menu:** accessible dialogs and menus with focus management, styled with Meridian tokens.
+  - **Sonner:** transient confirmation toasts.
+  - **@dnd-kit:** drag and drop on the task board (added with the task views).
+- **Why.** Accessible modals, menus and drag-and-drop are costly to get right by hand. These libraries are unstyled or lightly styled, so the design system stays in control.

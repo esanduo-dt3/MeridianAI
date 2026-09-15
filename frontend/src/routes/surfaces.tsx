@@ -14,11 +14,11 @@ import {
   NotePencil,
   Pulse,
   Tray,
-  UsersThree,
 } from '@phosphor-icons/react'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
 import { ReliabilityNote } from '../components/ReliabilityNote'
+import { AdminOnly } from '../workspace/AdminOnly'
 
 function Page({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-8">{children}</div>
@@ -107,10 +107,12 @@ export function ReviewQueuePage() {
         status="not-built"
         description="Low-confidence answers, failed groundedness checks and pending agent actions that need a person."
       />
+      <AdminOnly>
       <EmptyState icon={Tray} title="Nothing waiting for review">
         Flagged answers and actions will collect here. You can confirm, correct or dismiss each one, and every decision
         is recorded in the audit log.
       </EmptyState>
+      </AdminOnly>
     </Page>
   )
 }
@@ -123,9 +125,11 @@ export function AuditLogPage() {
         status="not-built"
         description="Every answer, proposed action and review decision, with the time and who or what made it."
       />
+      <AdminOnly>
       <EmptyState icon={ListMagnifyingGlass} title="No activity recorded">
         Entries are written by people, the agent and the system, and each one says which.
       </EmptyState>
+      </AdminOnly>
     </Page>
   )
 }
@@ -138,25 +142,12 @@ export function PipelineHealthPage() {
         status="not-built"
         description="Retrieval hit rate, groundedness pass rate and latency, calculated from recorded retrieval runs."
       />
+      <AdminOnly>
       <EmptyState icon={Pulse} title="No retrieval runs yet">
         Figures appear after the first question is answered. Every number on this page comes from a recorded run, and
         none are estimated.
       </EmptyState>
-    </Page>
-  )
-}
-
-export function MembersPage() {
-  return (
-    <Page>
-      <PageHeader
-        title="Members"
-        status="not-built"
-        description="Invite people and choose whether each one is a Member or an Admin in this workspace."
-      />
-      <EmptyState icon={UsersThree} title="Member management isn't available yet">
-        Roles are set per workspace, so the same person can be an Admin here and a Member somewhere else.
-      </EmptyState>
+      </AdminOnly>
     </Page>
   )
 }

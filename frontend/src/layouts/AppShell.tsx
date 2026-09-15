@@ -16,9 +16,12 @@ import {
   type Icon,
 } from '@phosphor-icons/react'
 import { useAuth } from '../auth/AuthProvider'
+import { Avatar } from '../components/Avatar'
 import { ReliabilityNote } from '../components/ReliabilityNote'
 import { Wordmark } from '../components/Wordmark'
 import { ThemeToggle } from '../theme/ThemeToggle'
+import { WorkspaceSwitcher } from '../workspace/WorkspaceSwitcher'
+import { useWorkspace } from '../workspace/WorkspaceProvider'
 
 interface NavItem {
   to: string
@@ -27,17 +30,18 @@ interface NavItem {
 }
 
 const workspaceNav: NavItem[] = [
+  { to: '/tasks', label: 'Tasks', icon: CheckSquareOffset },
   { to: '/ask', label: 'Ask', icon: ChatTeardropText },
   { to: '/notes', label: 'Notes', icon: NotePencil },
   { to: '/documents', label: 'Documents', icon: Files },
-  { to: '/tasks', label: 'Tasks', icon: CheckSquareOffset },
+  { to: '/members', label: 'Members', icon: UsersThree },
 ]
 
+// Shown to Admins only; the pages and the API enforce the same rule.
 const adminNav: NavItem[] = [
   { to: '/admin/review', label: 'Review queue', icon: Tray },
   { to: '/admin/audit', label: 'Audit log', icon: ListMagnifyingGlass },
   { to: '/admin/health', label: 'Pipeline health', icon: Pulse },
-  { to: '/admin/members', label: 'Members', icon: UsersThree },
 ]
 
 export function AppShell() {
@@ -141,15 +145,16 @@ interface SidebarProps {
 }
 
 function Sidebar({ layoutGroup, onNavigate }: SidebarProps) {
+  const { isAdmin } = useWorkspace()
   return (
-    <div className="flex h-full flex-col px-3 pt-5 pb-4">
-      <div className="px-3 pb-6">
-        <Wordmark size="sm" />
+    <div className="flex h-full flex-col px-3 pt-4 pb-4">
+      <div className="pb-5">
+        <WorkspaceSwitcher onNavigate={onNavigate} />
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-6 overflow-y-auto">
         <NavGroup label="Workspace" items={workspaceNav} layoutGroup={layoutGroup} onNavigate={onNavigate} />
-        <NavGroup label="Admin" items={adminNav} layoutGroup={layoutGroup} onNavigate={onNavigate} />
+        {isAdmin && <NavGroup label="Admin" items={adminNav} layoutGroup={layoutGroup} onNavigate={onNavigate} />}
       </nav>
 
       <div className="flex flex-col gap-4 border-t border-rule px-3 pt-4">
@@ -205,10 +210,11 @@ function NavGroup({ label, items, layoutGroup, onNavigate }: SidebarProps & { la
 
 function UserMenu() {
   const { user, signOut } = useAuth()
+  const { profile } = useWorkspace()
   const [error, setError] = useState<string | null>(null)
-  const email = user?.email ?? 'Signed in'
-  const name = (user?.user_metadata?.full_name as string | undefined) ?? email
-  const avatar = user?.user_metadata?.avatar_url as string | undefined
+  const email = profile?.email ?? user?.email ?? 'Signed in'
+  const name = profile?.full_name ?? (user?.user_metadata?.full_name as string | undefined) ?? email
+  const avatar = profile?.avatar_url ?? (user?.user_metadata?.avatar_url as string | undefined)
 
   async function handleSignOut() {
     setError(null)
@@ -222,13 +228,7 @@ function UserMenu() {
   return (
     <div>
       <div className="flex items-center gap-3">
-        {avatar ? (
-          <img src={avatar} alt="" referrerPolicy="no-referrer" className="size-8 shrink-0 rounded-full bg-sunken" width={32} height={32} />
-        ) : (
-          <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-cobalt-wash text-sm font-semibold text-cobalt">
-            {name.charAt(0).toUpperCase()}
-          </span>
-        )}
+        <Avatar name={name} email={email} src={avatar} size={32} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-ink" title={name}>
             {name}

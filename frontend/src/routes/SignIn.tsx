@@ -32,7 +32,7 @@ export function SignIn() {
 
   if (!loading && session) {
     const from = (location.state as { from?: string } | null)?.from
-    return <Navigate to={from && from !== '/signin' ? from : '/ask'} replace />
+    return <Navigate to={from && from !== '/signin' ? from : '/tasks'} replace />
   }
 
   async function handleSignIn() {

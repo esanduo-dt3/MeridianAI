@@ -11,6 +11,28 @@ Newest first. Each entry states what exists, how it was verified, and what is bl
 
 ## Day 1 (2026-09-15)
 
+### Part 5: Workspaces and members (committed on `feature/workspaces`)
+
+- **Built.**
+  - **API:** `/me` with workspaces; create, list, rename and leave workspaces; roster, add or invite by email, change role, remove, revoke invite. Every change is audit-logged.
+  - **Database:** `find_user_id_by_email`, callable by the service role only.
+  - **Frontend:** first-run "Create your first workspace" page; workspace switcher with role badges and "Create workspace"; Members page (invite form, roster with role controls, pending invites, leave workspace); Admin navigation and pages hidden from Members.
+- **Verified.**
+  - `pytest`: 17 passed.
+  - Database access suite: 38 passed.
+  - Live API run against Supabase with test accounts: 21 passed.
+  - Browser run (new user, Admin, Member, light and dark, mobile): all checks passed after fixing the test's invite assertion.
+- **Not yet merged or pushed.** Waiting for owner approval.
+
+### Part 4: Dark theme and sign-in fixes (committed on `feature/theme-toggle` and `fix/signin-back-navigation`)
+
+- Light and dark themes with a System, Light and Dark control ([D-017](decisions.md#d-017)).
+- Sign-in:
+  - failures are now visible, with the exact reason under the button;
+  - Back from Google no longer freezes the button;
+  - a blocked redirect is explained.
+- **Owner action pending:** Google sign-in fails with "Unable to exchange external code", because the Client Secret saved in Supabase does not match the Google OAuth client. The secret the owner has was verified as valid against Google.
+
 ### Part 3: Database schema (merged to `dev`, not yet applied to Supabase)
 
 - **Written.**

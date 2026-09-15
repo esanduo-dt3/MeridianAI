@@ -1,0 +1,48 @@
+import pytest
+
+WORKSPACE = {"X-Workspace-Id": "00000000-0000-0000-0000-00000000000a"}
+
+PROTECTED = [
+    ("get", "/workspaces", None),
+    ("post", "/workspaces", {"name": "New"}),
+    ("get", "/members", None),
+    ("post", "/admin/members", {"email": "a@b.co"}),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body"), PROTECTED)
+def test_routes_require_a_token(client, method, path, body):
+    response = getattr(client, method)(path, json=body, headers=WORKSPACE) if body else getattr(client, method)(path, headers=WORKSPACE)
+    assert response.status_code == 401
+
+
+ADMIN_ONLY = [
+    ("post", "/admin/members", {"email": "new@example.com", "auth_role": "Member"}),
+    ("patch", "/admin/members/00000000-0000-0000-0000-000000000009", {"auth_role": "Admin"}),
+    ("delete", "/admin/members/00000000-0000-0000-0000-000000000009", None),
+    ("delete", "/admin/invites/00000000-0000-0000-0000-000000000009", None),
+    ("patch", "/workspace", {"name": "Renamed"}),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body"), ADMIN_ONLY)
+def test_members_cannot_use_admin_routes(client, as_member, method, path, body):
+    call = getattr(client, method)
+    response = call(path, json=body, headers=WORKSPACE) if body else call(path, headers=WORKSPACE)
+    assert response.status_code == 403
+    assert "Admin" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("email", ["not-an-email", "a@b", " @x.com", "x" * 250 + "@example.com"])
+def test_invalid_emails_are_rejected_before_any_lookup(client, as_admin, email):
+    response = client.post("/admin/members", json={"email": email}, headers=WORKSPACE)
+    assert response.status_code == 422
+
+
+def test_workspace_header_must_be_a_uuid(client):
+    from app.core.security import AuthenticatedUser, get_current_user
+    from app.main import app
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id="u", email=None, token="t")
+    response = client.get("/members", headers={"X-Workspace-Id": "not-a-uuid"})
+    assert response.status_code == 422
