@@ -8,7 +8,8 @@ import { queryClient } from './lib/queryClient'
 import { MembersPage } from './routes/MembersPage'
 import { NotFound } from './routes/NotFound'
 import { SignIn } from './routes/SignIn'
-import { AskPage, AuditLogPage, NotesPage, PipelineHealthPage, ReviewQueuePage } from './routes/surfaces'
+import { AskPage, AuditLogPage, PipelineHealthPage, ReviewQueuePage } from './routes/surfaces'
+import { NotesPage } from './routes/NotesPage'
 import { DocumentsPage } from './routes/DocumentsPage'
 import { DocumentViewer } from './routes/DocumentViewer'
 import { TasksPage } from './routes/TasksPage'
@@ -51,6 +52,7 @@ export default function App() {
                       <Route index element={<Navigate to="/tasks" replace />} />
                       <Route path="ask" element={<AskPage />} />
                       <Route path="notes" element={<NotesPage />} />
+                      <Route path="notes/:noteId" element={<NotesPage />} />
                       <Route path="documents" element={<DocumentsPage />} />
                       <Route path="documents/:documentId" element={<DocumentViewer />} />
                       <Route path="tasks" element={<TasksPage />} />

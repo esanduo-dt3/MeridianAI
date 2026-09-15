@@ -138,3 +138,22 @@ export interface DocumentDetail extends DocumentSummary {
   content_text: string | null
   chunks: ChunkInfo[]
 }
+
+/** A Tiptap/ProseMirror JSON document: the note's block tree. */
+export interface BlockDoc {
+  type: 'doc'
+  content?: Array<Record<string, unknown>>
+}
+
+export interface NoteSummary {
+  id: string
+  title: string
+  preview: string
+  created_at: string
+  updated_at: string
+  created_by: { id: string; email: string; full_name: string | null; avatar_url: string | null } | null
+}
+
+export interface Note extends NoteSummary {
+  content: BlockDoc
+}

@@ -33,6 +33,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-024](#d-024) | PyMuPDF for PDF parsing, licence flagged | Accepted | Owner | 2026-09-16 |
 | [D-025](#d-025) | The workspace is the search namespace | Accepted | Owner | 2026-09-16 |
 | [D-026](#d-026) | Gemini behind a provider gateway, Voyage for reranking | Accepted | Owner | 2026-09-16 |
+| [D-029](#d-029) | Block note editor on Tiptap, stored as its JSON tree | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -347,3 +348,16 @@ Each of these closes a gap the UI or the guardrails need.
   - Without Voyage, retrieval falls back to fusion order plus an LLM grade, and confidence is reported as unavailable.
   - The response cache is per process. A shared cache for demo pre-warming is Day 5 work.
 
+
+## D-029
+
+**Block note editor on Tiptap, stored as its JSON tree**
+
+- **Context.** The PRD requires a block-based note editor with notes stored as a real block tree, not a flat string.
+- **Decision.**
+  - The editor is Tiptap 3 (ProseMirror).
+  - `notes.content` stores the editor's JSON document unchanged: a `doc` node whose children are typed blocks (paragraph, heading, bulletList, orderedList, taskList, blockquote, codeBlock, horizontalRule), with marks for bold, italic, strike, code and links.
+  - The API rejects anything that is not such a tree, notes over 512 KB, and nesting deeper than 40 levels.
+  - Editing autosaves after a 700 ms pause, and flushes pending changes when the note closes or the tab is hidden.
+  - The API uses `POST /notes` to create and `PATCH /notes/{id}` to update, in place of the PRD's single `POST /notes`.
+- **Why.** ProseMirror's document model is already a typed block tree, so storing its JSON satisfies the requirement with no conversion layer, and the agent can walk it on Day 4 to propose tasks from a note.

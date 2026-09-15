@@ -9,7 +9,6 @@ import {
   ArrowRight,
   ChatTeardropText,
   ListMagnifyingGlass,
-  NotePencil,
   Pulse,
   Tray,
 } from '@phosphor-icons/react'
@@ -47,21 +46,6 @@ export function AskPage() {
         can ask about it here.
       </EmptyState>
       <ReliabilityNote />
-    </Page>
-  )
-}
-
-export function NotesPage() {
-  return (
-    <Page>
-      <PageHeader
-        title="Notes"
-        status="not-built"
-        description="Write in blocks. The agent can suggest tasks from a note, but it never edits the note itself."
-      />
-      <EmptyState icon={NotePencil} title="No notes yet">
-        Notes you create will be listed here, newest first.
-      </EmptyState>
     </Page>
   )
 }
