@@ -35,6 +35,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-026](#d-026) | Gemini behind a provider gateway, Voyage for reranking | Accepted | Owner | 2026-09-16 |
 | [D-027](#d-027) | Confidence formula and review flags | Accepted | Engineering | 2026-09-16 |
 | [D-028](#d-028) | LangChain, not LangGraph, for the agent | Accepted | Owner | 2026-09-16 |
+| [D-030](#d-030) | Rewrite and grade only when retrieval is uncertain | Accepted | Owner | 2026-09-16 |
 
 ---
 
@@ -374,3 +375,24 @@ Each of these closes a gap the UI or the guardrails need.
   - The agent's job is small: search the workspace, read tasks, and propose a task that is held for approval. A single tool-calling loop covers it.
   - The retrieval loop (search, assess, rewrite once, retry) is plain Python with no orchestration framework.
 - **Consequences.** No graph state or checkpointer. Approval is handled by `agent_actions` rows and the atomic approve and reject functions ([D-009](#d-009)), not by pausing an agent.
+
+## D-030
+
+**Rewrite and grade only when retrieval is uncertain**
+
+- **Context.** PRD section 7.1 describes the pipeline as: rewrite the query, run hybrid retrieval, rerank, grade relevance, retry if weak, then check groundedness. Taken literally, that is two model calls before every search. Section 14 warns the full pipeline risks 10 to 20 seconds against a p50 target under 8 seconds.
+- **Decision.** The owner chose this order:
+  1. The first attempt searches with the user's own question, with no rewrite.
+  2. Hybrid search, then the cross-encoder rerank, then MMR.
+  3. The reranker's top score is the first grade:
+     - at or above 0.50 counts as good, with no model call;
+     - below 0.22 counts as weak;
+     - only the band in between is graded by the fast model.
+  4. A weak result triggers one query rewrite and a second attempt (two attempts at most), and the better attempt is used.
+  5. The groundedness check always runs.
+  6. The agent never asks the user a clarifying question.
+- **Why.** Embeddings handle natural-language questions well, so a rewrite mainly helps a failed first attempt. The cross-encoder has already read the question and each passage together, so its score is a better and free relevance signal than an extra model call in the clear cases. The common path makes zero model calls before answer generation, which protects the latency budget without cutting the retry loop.
+- **Consequences.**
+  - Grading, retry and groundedness all still exist, as the PRD's MUST scope requires.
+  - `retrieval_runs.candidates_json` records each attempt's query, grade and note, so the pipeline health view and Gate G1 can show which path each question took.
+  - The demo narration should describe the pipeline in this order.
