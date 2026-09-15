@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { motion, useReducedMotion } from 'motion/react'
 import { GoogleLogo, WarningCircle } from '@phosphor-icons/react'
@@ -9,11 +9,25 @@ import { Wordmark } from '../components/Wordmark'
 import { missingSupabaseConfig } from '../lib/supabaseClient'
 
 export function SignIn() {
-  const { session, loading, configured, signInWithGoogle } = useAuth()
+  const { session, loading, configured, authError, clearAuthError, signInWithGoogle } = useAuth()
   const location = useLocation()
   const reduce = useReducedMotion()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [stalled, setStalled] = useState(false)
+
+  // Returning with the Back button (for example from a Google error page) restores
+  // this page from the back-forward cache with the button still busy. Re-enable it.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setPending(false)
+        setStalled(false)
+      }
+    }
+    window.addEventListener('pageshow', onPageShow)
+    return () => window.removeEventListener('pageshow', onPageShow)
+  }, [])
 
   if (!loading && session) {
     const from = (location.state as { from?: string } | null)?.from
@@ -22,10 +36,19 @@ export function SignIn() {
 
   async function handleSignIn() {
     setError(null)
+    setStalled(false)
+    clearAuthError()
     setPending(true)
     try {
       await signInWithGoogle()
-      // The browser now redirects to Google; keep the button busy until it does.
+      // The browser is now leaving for Google. If it is still here after a few
+      // seconds, something blocked the navigation (for example an in-editor preview).
+      window.setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          setPending(false)
+          setStalled(true)
+        }
+      }, 4000)
     } catch (err) {
       setPending(false)
       setError(err instanceof Error ? err.message : 'Google sign-in could not start. Try again.')
@@ -66,6 +89,26 @@ export function SignIn() {
                 <p role="alert" className="flex max-w-[42ch] gap-2 text-sm text-danger">
                   <WarningCircle aria-hidden size={18} weight="bold" className="mt-px shrink-0" />
                   {error}
+                </p>
+              )}
+
+              {authError && !pending && (
+                <p role="alert" className="flex max-w-[46ch] gap-2 text-sm leading-relaxed text-danger">
+                  <WarningCircle aria-hidden size={18} weight="bold" className="mt-0.5 shrink-0" />
+                  <span>
+                    Google sign-in didn't finish. <span className="font-medium">{authError}</span>
+                  </span>
+                </p>
+              )}
+
+              {stalled && (
+                <p role="alert" className="flex max-w-[46ch] gap-2 text-sm leading-relaxed text-flag">
+                  <WarningCircle aria-hidden size={18} weight="bold" className="mt-0.5 shrink-0" />
+                  <span>
+                    Your browser didn't open Google sign-in. If you're using a preview inside your editor, open{' '}
+                    <code className="font-mono text-[13px]">{window.location.origin}</code> in Chrome or Safari and sign in
+                    there. Sign-in has to start and finish in the same browser.
+                  </span>
                 </p>
               )}
 

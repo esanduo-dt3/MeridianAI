@@ -22,6 +22,7 @@ if (missingSupabaseConfig.length > 0) {
 export const supabase: SupabaseClient | null =
   url && publishableKey
     ? createClient(url, publishableKey, {
-        auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        // The OAuth callback is handled explicitly in AuthProvider so failures can be shown to the user.
+        auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
       })
     : null
