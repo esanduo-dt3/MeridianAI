@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       // Redirect ourselves so the caller can tell when the browser didn't leave the page.
-      options: { redirectTo: `${window.location.origin}/ask`, skipBrowserRedirect: true },
+      options: { redirectTo: `${window.location.origin}/tasks`, skipBrowserRedirect: true },
     })
     if (error) throw error
     if (!data.url) throw new Error('Google sign-in could not start. Try again.')

@@ -11,24 +11,35 @@ Errors return `{"detail": "<message>"}`.
 | Status | Meaning |
 | --- | --- |
 | 401 | Missing, malformed, expired or wrongly signed token |
+| 400 | A workspace-scoped route was called without `X-Workspace-Id` |
 | 403 | Not a member of the workspace, or the role does not allow the action |
+| 404 | The member, invite or task does not exist in this workspace |
+| 409 | Conflicts with current state: already a member, already invited, or the last Admin |
+| 422 | Invalid input, such as a bad email, blank name or malformed id |
 | 503 | A dependency (the workspace lookup) is unavailable. Never answered with unscoped data |
 
 ## Implemented
 
-| Method and path | Auth | Returns |
-| --- | --- | --- |
-| `GET /health` | None | `{"status": "ok"}` |
-| `GET /me` | Token and workspace membership | `user_id`, `email`, `workspace_id`, `workspace_name`, `auth_role` |
+| Method and path | Scope | Role | Returns |
+| --- | --- | --- | --- |
+| `GET /health` | None | Public | `{"status": "ok"}` |
+| `GET /me` | Signed in | Any | `user` (id, email, full_name, avatar_url) and `workspaces` (id, name, auth_role, created_at) |
+| `GET /workspaces` | Signed in | Any | Workspaces the caller belongs to |
+| `POST /workspaces` | Signed in | Any | Creates a workspace; caller becomes Admin. Body `{name}` (1–80 chars, trimmed) |
+| `PATCH /workspace` | Workspace | Admin | Renames the workspace. Body `{name}` |
+| `DELETE /members/me` | Workspace | Any | Leaves the workspace. 409 if the caller is its last Admin |
+| `GET /members` | Workspace | Any | `members` with profiles; `invites` (pending) for Admins only |
+| `POST /admin/members` | Workspace | Admin | Body `{email, auth_role}`. Adds an existing account (`outcome: "added"`) or stores a pending invite (`"invited"`). 409 if already a member or already invited |
+| `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`. 409 if it would leave no Admin |
+| `DELETE /admin/members/{id}` | Workspace | Admin | Removes a member. 409 if it would leave no Admin |
+| `DELETE /admin/invites/{id}` | Workspace | Admin | Revokes a pending invite |
 
-> `GET /me` will change shape when workspace endpoints land: it will return the user and a list of their workspaces, and stop requiring a membership. See [progress.md](../progress.md).
+"Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
 
 ## Planned (MUST scope)
 
 | Method and path | Role | Purpose |
 | --- | --- | --- |
-| `GET /workspaces` | Signed in | Workspaces the caller belongs to |
-| `POST /workspaces` | Signed in | Create a workspace; caller becomes Admin |
 | `POST /documents/upload` | Admin | Upload and parse a document |
 | `POST /notes` | Member | Create or update a note |
 | `POST /agent/ask` | Member | Ask a grounded question |
@@ -40,6 +51,5 @@ Errors return `{"detail": "<message>"}`.
 | `POST /admin/reviews/{target_type}/{target_id}` | Admin | Record a review decision |
 | `GET /admin/audit-log` | Admin | Audit trail |
 | `GET /admin/pipeline-health` | Admin | Metrics computed from `retrieval_runs` |
-| `POST /admin/members` | Admin | Add or invite a member with a role |
 
-Two rows go beyond the PRD. `PATCH /tasks/{id}` is limited to status here because Members may change status ([D-006](../decisions.md#d-006)). The workspace routes are also new ([D-006](../decisions.md#d-006)).
+`PATCH /tasks/{id}` goes beyond the PRD: a Member may change status only ([D-006](../decisions.md#d-006)). The workspace and member routes above are also additions from D-006 and D-007.
