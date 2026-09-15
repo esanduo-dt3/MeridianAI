@@ -42,7 +42,7 @@ Approach: [D-015](../decisions.md#d-015). Schema reference: [architecture/data-m
 
 - **What it does.** It runs the migrations on a temporary cluster, swapping `vector` columns for `float4[]` in the local copy because pgvector isn't needed to test access rules. Then it signs in as different users by setting `request.jwt.claims`, the same mechanism Supabase uses.
 - **When to run it.** Before every migration is applied.
-- **Last result.** 36 passed, 0 failed (2026-09-15).
+- **Last result.** 56 passed, 0 failed (2026-09-15).
 
 ## Connection strings
 

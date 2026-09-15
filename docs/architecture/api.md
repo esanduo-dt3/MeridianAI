@@ -33,6 +33,12 @@ Errors return `{"detail": "<message>"}`.
 | `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`. 409 if it would leave no Admin |
 | `DELETE /admin/members/{id}` | Workspace | Admin | Removes a member. 409 if it would leave no Admin |
 | `DELETE /admin/invites/{id}` | Workspace | Admin | Revokes a pending invite |
+| `GET /tasks` | Workspace | Any | `tasks` (with assignee and creator profiles) and `proposals` (pending agent actions) |
+| `POST /tasks` | Workspace | Admin | Body `{title, description?, status?, priority?, due_date?, assignee_id?, parent_task_id?}`. Assignee must be a member |
+| `PATCH /tasks/{id}` | Workspace | Admin: any field. Member: `status`, `position` only | Returns the updated task. 409 for a loop in the subtask tree |
+| `DELETE /tasks/{id}` | Workspace | Admin | Deletes the task and its subtasks |
+| `POST /agent/actions/{id}/approve` | Workspace | Admin | Writes the proposed task (`source: "agent"`), records the decision and audit entry atomically. 409 if already decided |
+| `POST /agent/actions/{id}/reject` | Workspace | Admin | Records the rejection and audit entry; writes no task. 409 if already decided |
 
 "Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
 
@@ -43,13 +49,9 @@ Errors return `{"detail": "<message>"}`.
 | `POST /documents/upload` | Admin | Upload and parse a document |
 | `POST /notes` | Member | Create or update a note |
 | `POST /agent/ask` | Member | Ask a grounded question |
-| `GET /tasks` | Member | Tasks, plus agent proposals awaiting approval |
-| `PATCH /tasks/{id}` (status only) | Member | Change a task's status |
-| `POST /agent/actions/{id}/approve` | Admin | Approve and write a proposed action; audit logged |
-| `POST /agent/actions/{id}/reject` | Admin | Reject a proposal; nothing written; audit logged |
 | `GET /admin/review-queue` | Admin | Flagged answers and pending actions |
 | `POST /admin/reviews/{target_type}/{target_id}` | Admin | Record a review decision |
 | `GET /admin/audit-log` | Admin | Audit trail |
 | `GET /admin/pipeline-health` | Admin | Metrics computed from `retrieval_runs` |
 
-`PATCH /tasks/{id}` goes beyond the PRD: a Member may change status only ([D-006](../decisions.md#d-006)). The workspace and member routes above are also additions from D-006 and D-007.
+Beyond the PRD: the workspace and member routes ([D-006](../decisions.md#d-006), [D-007](../decisions.md#d-007)), and `POST`, `PATCH` and `DELETE /tasks` for the task views ([D-020](../decisions.md#d-020), [D-021](../decisions.md#d-021)).

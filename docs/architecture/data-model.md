@@ -50,7 +50,7 @@ erDiagram
 `id` · `workspace_id` · `created_by` · `title`, `created_at` ([D-011](../decisions.md#d-011)) · `content` (jsonb block tree, must be an object) · `updated_at` (maintained by trigger)
 
 **`tasks`**
-`id` · `workspace_id` · `sprint_id` (nullable, no foreign key, [D-010](../decisions.md#d-010)) · `title` · `status` (`todo`, `in_progress`, `done`) · `assignee_id` · `due_date` · `created_by` · `source` (`manual` or `agent`) · `created_at`
+`id` · `workspace_id` · `sprint_id` (nullable, no foreign key, [D-010](../decisions.md#d-010)) · `title` · `status` (`todo`, `in_progress`, `done`) · `assignee_id` · `due_date` · `created_by` · `source` (`manual` or `agent`) · `created_at` · `description`, `priority` (`none` … `urgent`), `parent_task_id` (subtasks, same workspace, no loops, cascade delete), `position` (ordering), `updated_at`, `completed_at` (set when done) ([D-020](../decisions.md#d-020))
 
 ## Agent, retrieval and oversight
 
@@ -80,7 +80,12 @@ erDiagram
 | `private.is_member(ws)`, `private.is_admin(ws)` | Function | Role checks used by RLS policies; they only answer for the current user |
 | `private.shares_workspace(user)` | Function | Lets people see profiles of co-members only |
 | `on_auth_user_created` | Trigger on `auth.users` | Creates the profile and accepts pending invites |
-| `tasks_member_update_guard` | Trigger | Members may change `status` only |
+| `tasks_member_update_guard` | Trigger | Members may change `status` and `position` only ([D-021](../decisions.md#d-021)) |
+| `tasks_validate_parent` | Trigger | A subtask's parent is in the same workspace, and the tree has no loops |
+| `tasks_touch` | Trigger | Maintains `updated_at` and `completed_at` |
+| `public.approve_agent_action(action, approver)` | Function (service role only) | Re-checks Admin, writes the task as `source = 'agent'`, records the decision and audit entry in one transaction |
+| `public.reject_agent_action(action, approver)` | Function (service role only) | Re-checks Admin, records the rejection and audit entry; writes no task |
+| `public.find_user_id_by_email(email)` | Function (service role only) | Finds an account for adding a member by email |
 | `audit_log_no_update` | Trigger | Rejects updates and deletes on `audit_log` |
 | `workspace_members_keep_one_admin` | Trigger | A workspace keeps at least one Admin |
 | `notes_touch_updated_at` | Trigger | Maintains `notes.updated_at` |
