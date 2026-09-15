@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import agent_actions, documents, health, me, members, tasks, workspaces
+from app.api import agent_actions, ask, documents, health, me, members, tasks, workspaces
 from app.core.config import get_settings
 
 
@@ -27,6 +27,7 @@ def create_app() -> FastAPI:
     app.include_router(tasks.router)
     app.include_router(agent_actions.router)
     app.include_router(documents.router)
+    app.include_router(ask.router)
     return app
 
 
