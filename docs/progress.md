@@ -1,6 +1,10 @@
 # Build progress
 
-Newest first. Each entry states what exists, how it was verified, and what is blocked. Gate results are reported here by name.
+Newest first. Each entry states what exists, the verification recorded when that work was completed, and what is blocked. Gate results are reported here by name. Unless an entry explicitly says a check was rerun, recorded test, live API, and browser results are historical rather than a result of the current source-control review.
+
+## Current source-control status
+
+The active branch is `dev` at `4122c79` (`Merge feature/tasks into dev`), and it is aligned with `origin/dev`. The workspace and task feature work, along with the prior theme and sign-in fixes, are merged into and pushed on `dev`. The `main` branch remains at the initial repository baseline commit, `5766775`.
 
 ## Gate status
 
@@ -8,6 +12,42 @@ Newest first. Each entry states what exists, how it was verified, and what is bl
 | --- | --- | --- |
 | G1: 12 of 15 golden questions cite the correct chunk | End of Day 3 | Not yet run |
 | G2: propose, approve and write round trip | End of Day 4 | Not yet run |
+
+## Day 2 (2026-09-16)
+
+### Part 8: Block note editor (committed on `feature/notes`)
+
+- **Built.**
+  - **Notes API:** block-tree content validated server-side; any member creates and edits; the author or an Admin deletes.
+  - **Notes page:** list with search and relative times; a Tiptap editor with a `/` block menu (headings, bulleted, numbered and to-do lists, quote, code, divider) and a bubble menu (bold, italic, strike, code, link); autosave with a Saving and Saved indicator; delete with confirmation; a mobile layout.
+- **Verified.**
+  - `pytest`: 46 passed.
+  - Live notes API run: 8 passed.
+  - Browser run (slash menu, bubble menu, autosave to a real block tree, reload, Member edit, delete rules, dark and mobile): 15 passed.
+- **Bug found and fixed.** Enter in the title moved focus to the body one animation frame late, so fast typing landed in the title.
+
+### Part 7: Ingestion and Documents page (committed on `feature/ingestion`)
+
+- **Built.**
+  - PDF and Word parsing: layout, tables, headings, and headers and footers removed.
+  - Section-aware chunking where every chunk is an exact span of the stored document text.
+  - Gemini embeddings behind the provider gateway; background processing with status; workspace-scoped storage; duplicate detection.
+  - Documents page with a workspace picker for uploads, live status, retry and delete, and a passage inspector that highlights exact character spans.
+- **Verified.**
+  - Database access suite: 65 passed.
+  - `pytest` (including offset invariants on generated PDF and Word files): 38 passed on this branch.
+  - Live upload run: 11 passed. Browser run: 11 passed.
+- **Blocked on.** `GEMINI_API_KEY` for real embeddings. Without it, uploads correctly end in Failed with "Embedding failed".
+
+### Retrieval pipeline (committed on `feature/retrieval`, built on ingestion)
+
+- **Built.**
+  - Hybrid dense and keyword search, reciprocal rank fusion, Voyage cross-encoder rerank, MMR.
+  - A confidence gate with one rewrite and retry (two attempts at most).
+  - Grounded answers with renumbered chunk citations, a groundedness check, uncalibrated confidence and review flags.
+  - `POST /agent/ask` records `retrieval_runs`, answers and citations.
+- **Verified.** Unit tests for fusion, MMR, citations, the confidence formula and prompt isolation.
+- **Blocked on.** `GEMINI_API_KEY` and `VOYAGE_API_KEY` for a live run and for Gate G1.
 
 ## Day 1 (2026-09-15)
 
@@ -26,7 +66,7 @@ Newest first. Each entry states what exists, how it was verified, and what is bl
   - Live API run: 20 passed.
   - Browser run (Admin, Member, light and dark, mobile, pointer and keyboard drag): 25 passed.
 - **Bug found and fixed during testing.** Cross-column drops failed once a column was taller than the screen: corner-distance collision detection preferred cards in the starting column. The board now uses what is under the pointer first.
-- **Not yet merged or pushed.** Waiting for owner approval.
+- **Integrated and pushed.** Merged into `dev` by `4122c79` and present on `origin/dev`.
 
 ### Part 5: Workspaces and members (committed on `feature/workspaces`)
 
@@ -39,7 +79,7 @@ Newest first. Each entry states what exists, how it was verified, and what is bl
   - Database access suite: 38 passed.
   - Live API run against Supabase with test accounts: 21 passed.
   - Browser run (new user, Admin, Member, light and dark, mobile): all checks passed after fixing the test's invite assertion.
-- **Not yet merged or pushed.** Waiting for owner approval.
+- **Integrated and pushed.** Merged into `dev` by `d46b20b` and included in the current `origin/dev` history.
 
 ### Part 4: Dark theme and sign-in fixes (committed on `feature/theme-toggle` and `fix/signin-back-navigation`)
 

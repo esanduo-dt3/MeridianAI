@@ -44,6 +44,11 @@ Errors return `{"detail": "<message>"}`.
 | `POST /documents/upload` | Workspace | Admin | Multipart `file` (PDF or DOCX, ≤ 25 MB). Returns 202 with `parsed_status: "pending"`; processing continues in the background. 409 duplicate, 413 too large, 415 unsupported type |
 | `POST /documents/{id}/reprocess` | Workspace | Admin | Re-runs parsing and embedding. 409 while already processing |
 | `DELETE /documents/{id}` | Workspace | Admin | Deletes the document, its chunks, embeddings and stored file |
+| `GET /notes` | Workspace | Any | Notes, newest first, with a plain-text preview and author |
+| `GET /notes/{id}` | Workspace | Any | One note with its block-tree `content` |
+| `POST /notes` | Workspace | Any | Body `{title?, content?}`; content must be a `doc` block tree ([D-029](../decisions.md#d-029)). Starts with an empty paragraph |
+| `PATCH /notes/{id}` | Workspace | Any | Body `{title?, content?}`. 422 for flat or invalid content |
+| `DELETE /notes/{id}` | Workspace | Author or Admin | 404 when the note does not exist or the caller may not delete it |
 
 "Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
 
@@ -51,7 +56,6 @@ Errors return `{"detail": "<message>"}`.
 
 | Method and path | Role | Purpose |
 | --- | --- | --- |
-| `POST /notes` | Member | Create or update a note |
 | `POST /agent/ask` | Member | Ask a grounded question |
 | `GET /admin/review-queue` | Admin | Flagged answers and pending actions |
 | `POST /admin/reviews/{target_type}/{target_id}` | Admin | Record a review decision |
