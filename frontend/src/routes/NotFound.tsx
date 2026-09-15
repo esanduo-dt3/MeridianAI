@@ -11,7 +11,7 @@ export function NotFound() {
         <p className="mt-3 text-[15px] leading-relaxed text-ink-2">Check the address, or go back to your workspace.</p>
         <Link
           to="/ask"
-          className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-ink px-4 text-[15px] font-medium text-white hover:bg-[#252a31]"
+          className="mt-6 inline-flex min-h-11 items-center rounded-(--radius-control) bg-ink px-4 text-[15px] font-medium text-on-ink hover:bg-ink-hover"
         >
           Go to workspace
         </Link>

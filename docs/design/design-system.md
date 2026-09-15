@@ -29,6 +29,23 @@ Meridian should feel like a precise instrument: calm, exact, and easy to check. 
 
 Status colour always comes with text or an icon, never colour alone.
 
+### Dark theme
+
+Every colour token is redefined under `[data-theme='dark']` in `index.css`. Components never branch on the theme; they use the same token utilities.
+
+| Token | Dark value | Note |
+| --- | --- | --- |
+| `paper` / `surface` / `sunken` | `#0d0f12` / `#15181c` / `#1c2025` | Graphite, not pure black |
+| `ink` / `ink-2` / `ink-3` | `#eceef1` / `#b4bac2` / `#8b939d` | `ink-3` stays above AA on `surface` |
+| `on-ink`, `ink-hover` | `#0d0f12`, `#ffffff` | Text and hover on primary (ink-filled) buttons |
+| `cobalt` | `#8098ff` | Lifted for contrast on dark surfaces |
+| `mark` | `#5b4a0f` | Amber wash, so cited text stays readable |
+| `grounded` / `flag` / `danger` | `#52c58e` / `#f0a64a` / `#ff7d74` | With matching dark washes |
+
+- **Default.** The preference is `system`, which follows the operating system. People can switch to Light or Dark with the theme control in the sidebar or on the sign-in page. The choice is stored in `localStorage` under `meridian-theme`.
+- **No flash.** An inline script in `index.html` sets `data-theme` before the first paint. `ThemeProvider` keeps it in sync, including live operating-system changes.
+- **Colours in code.** Never write raw colours in components. Use `on-ink` for text on an `ink` background, and the `--shadow-*` tokens for shadows.
+
 ## Type
 
 | Role | Family | Typical use |
