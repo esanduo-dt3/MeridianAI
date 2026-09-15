@@ -34,3 +34,6 @@ npm-debug.log*
 
 # Local AI design skills (never commit)
 claudeSkills/
+
+# Local reference material (never commit)
+alreadyDoneFullAgenticRag/
