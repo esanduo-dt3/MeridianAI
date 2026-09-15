@@ -81,7 +81,9 @@ def test_generate_answer_sends_passages_only_as_user_turn_data(monkeypatch):
 
             if "check whether an answer" in system:
                 return Generation(text='{"grounded": true, "unsupported": []}', model="fake")
-            return Generation(text='{"answer": "Six months [1].", "answerable": true}', model="fake")
+            return Generation(
+                text='{"answerable": true, "sentences": [{"text": "Six months.", "sources": [1]}]}', model="fake"
+            )
 
     monkeypatch.setattr(answer_module, "get_gateway", lambda: FakeGateway())
     from app.rag.retrieval import Attempt, RetrievalResult
@@ -116,3 +118,17 @@ def test_secrets_are_redacted_from_answers(secret):
 def test_wrap_untrusted_escapes_source_names():
     wrapped = wrap_untrusted("body", ordinal=2, source='evil" onload="x', flagged=False)
     assert 'source="evil&quot; onload=&quot;x"' in wrapped
+
+
+def test_compose_answer_places_markers_from_sources_before_final_punctuation():
+    from app.rag.answer import compose_answer
+
+    data = {
+        "answerable": True,
+        "sentences": [
+            {"text": "Rectifiers are inspected every six months [9].", "sources": [2, 1, 2]},
+            {"text": "Batteries last four years", "sources": [3]},
+            {"text": "No source here.", "sources": []},
+        ],
+    }
+    assert compose_answer(data) == "Rectifiers are inspected every six months [2][1]. Batteries last four years [3] No source here."
