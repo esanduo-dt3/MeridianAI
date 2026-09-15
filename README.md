@@ -1,40 +1,32 @@
-# MeridianAI
+# Meridian
 
-MeridianAI is an AI-native workspace that combines block-tree notes with a retrieval-grounded
-agent. The agent answers questions from workspace content with chunk-level citations, and any
-change it wants to make to the workspace is **proposed for human approval** rather than applied
-silently. All data is scoped to a workspace and protected by row-level security in Supabase.
+Meridian is an AI-native workspace for notes, documents and tasks. Its agent answers questions from your workspace and cites the exact passage behind every answer. It can propose a task, but nothing is written to the workspace until a person approves it.
 
 ## Reliability note
 
-Answers produced by the agent may be wrong. Every answer carries at least one chunk-level
-citation unless it is explicitly labelled as general knowledge, and every answer carries a
-stated confidence value. **That confidence value is uncalibrated** and must not be read as a
-probability of correctness. Verify cited sources before acting on an answer.
+AI-generated answers and agent actions may be incomplete or wrong. Every answer carries a chunk-level source citation and a stated confidence value. **That confidence value is uncalibrated**, so it is not a probability that the answer is correct. Low-confidence or ungrounded answers are routed to human review.
 
 ## Repository layout
 
-| Path | Purpose |
+| Path | Contents |
 | --- | --- |
-| `frontend/` | React + TypeScript + Vite application (Supabase Auth, Google sign-in) |
-| `backend/` | FastAPI service (Supabase JWT verification, workspace-scoped APIs) |
-| `kavia-docs/` | CodeWiki: specs, plans and onboarding documentation |
-| `assets/` | Static assets shared across the project |
+| `frontend/` | React web app (Vite, TypeScript, Tailwind) with Supabase Google sign-in |
+| `backend/` | FastAPI service: token verification, workspace scoping, and the retrieval and agent pipeline as it lands |
+| `supabase/` | SQL migrations and database access-rule tests |
+| `scripts/` | Database migration and test tooling |
+| `docs/` | Product, architecture, guides, decision log and build progress |
+| `Meridian_PRD_v2.pdf` | Product requirements |
 
-`frontend/` and `backend/` are added by the scaffolding steps that follow the repository baseline.
+## Quick start
 
-## Branch and commit conventions
+```bash
+cp frontend/.env.example frontend/.env && cp backend/.env.example backend/.env   # then fill them in
+cd backend && python3.13 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/uvicorn app.main:app --reload --port 8000
+cd frontend && npm install && npm run dev   # http://localhost:5173
+```
 
-- `main` — releasable state. Never force-pushed.
-- `dev` — integration branch and the base for all feature work.
-- `feature/<slug>` — one branch per feature, merged into `dev` when its task or subtask completes.
+The full setup, including the one-time Google OAuth configuration, is in [docs/guides/local-development.md](docs/guides/local-development.md).
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) with a scope
-naming the container or plane, for example `feat(frontend): add Supabase Google sign-in` or
-`chore(repo): initialize main and dev branches`.
+## Documentation
 
-## Configuration
-
-Neither container reads secrets from source. Each container documents its required variables in a
-committed `.env.example`; real values live in an untracked `.env` file or a deployment secret
-store. `.env` files are git-ignored repository-wide.
+Start at [docs/README.md](docs/README.md). Deviations from the PRD are recorded in [docs/decisions.md](docs/decisions.md), and current status is in [docs/progress.md](docs/progress.md).
