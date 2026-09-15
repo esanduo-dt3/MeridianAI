@@ -87,11 +87,12 @@ class GeminiProvider:
 
     _EMBED_BATCH = 100
 
-    def __init__(self, api_key: str, timeout_seconds: float):
+    def __init__(self, api_key: str, timeout_seconds: float, thinking_level: str):
         from google import genai
         from google.genai import types
 
         self._types = types
+        self._thinking_level = thinking_level
         self._client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(timeout=int(timeout_seconds * 1000)),
@@ -105,9 +106,14 @@ class GeminiProvider:
             "system_instruction": system,
             "max_output_tokens": max_tokens,
             "temperature": temperature,
-            # Short, structured calls do not benefit from hidden reasoning, and it
-            # counts against max_output_tokens.
-            "thinking_config": types.ThinkingConfig(thinking_budget=0),
+            # Short, structured calls gain little from hidden reasoning, and it
+            # counts against max_output_tokens. Gemini 3 takes a thinking level;
+            # older models take a token budget.
+            "thinking_config": (
+                types.ThinkingConfig(thinking_level=self._thinking_level)
+                if model.startswith("gemini-3")
+                else types.ThinkingConfig(thinking_budget=0)
+            ),
         }
         if json_schema is not None:
             config["response_mime_type"] = "application/json"
@@ -207,4 +213,6 @@ def get_gateway() -> ModelGateway:
     settings = get_settings()
     if settings.gemini_api_key is None or not settings.gemini_api_key.get_secret_value():
         raise ModelError("GEMINI_API_KEY is not set. Add it to backend/.env.")
-    return ModelGateway(GeminiProvider(settings.gemini_api_key.get_secret_value(), settings.llm_timeout_seconds))
+    return ModelGateway(
+        GeminiProvider(settings.gemini_api_key.get_secret_value(), settings.llm_timeout_seconds, settings.gemini_thinking_level)
+    )

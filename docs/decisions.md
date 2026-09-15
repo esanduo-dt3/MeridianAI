@@ -335,11 +335,12 @@ Each of these closes a gap the UI or the guardrails need.
 - **Decision.**
   - All model calls go through `app/llm/gateway.py`, a swappable provider interface with retries and an in-process response cache.
   - **Provider:** Gemini via `google-genai`:
-    - `gemini-2.5-flash` for answers;
-    - `gemini-2.5-flash-lite` for grading, query rewriting and groundedness checks;
+    - `gemini-3.5-flash` for answers;
+    - `gemini-3.5-flash-lite` for grading, query rewriting and groundedness checks;
+    - both with thinking level `minimal`;
     - `gemini-embedding-001` at 1536 dimensions, normalised to unit length, with retrieval task types.
   - **Reranking:** Voyage `rerank-2.5`, whose [0, 1] scores drive the confidence gate.
-  - Model names are configuration, not code.
+  - Model names are configuration, not code. The 2.5 models are not available to new Gemini API keys; the 3.5 models were chosen by live latency on a JSON answer: flash with minimal thinking about 1.2 s, flash-lite about 1.0 s, 3.6-flash 2.8 to 11.6 s.
 - **Why.** The PRD names a thin swappable gateway with a response cache. A cross-encoder reranker materially improves precision and gives a meaningful score to state confidence from.
 - **Consequences.**
   - Requires `GEMINI_API_KEY` and `VOYAGE_API_KEY`.

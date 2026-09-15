@@ -18,8 +18,11 @@ class Settings(BaseSettings):
 
     # --- Model provider (behind app/llm/gateway.py, D-026) ---
     gemini_api_key: SecretStr | None = None
-    gemini_answer_model: str = "gemini-2.5-flash"        # answer generation
-    gemini_fast_model: str = "gemini-2.5-flash-lite"     # query rewrite, grading, groundedness
+    gemini_answer_model: str = "gemini-3.5-flash"        # answer generation
+    gemini_fast_model: str = "gemini-3.5-flash-lite"     # query rewrite, grading, groundedness
+    # Gemini 3 models think before answering by default, which costs latency and
+    # output tokens. "minimal" keeps structured answers fast (D-026).
+    gemini_thinking_level: str = "minimal"
     gemini_embed_model: str = "gemini-embedding-001"
     embed_dim: int = 1536                                # must match chunk_embeddings.embedding
     llm_timeout_seconds: float = 60.0
