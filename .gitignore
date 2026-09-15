@@ -31,3 +31,6 @@ venv/
 # Logs
 *.log
 npm-debug.log*
+
+# Local AI design skills (never commit)
+claudeSkills/
