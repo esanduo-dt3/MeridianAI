@@ -37,7 +37,8 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-028](#d-028) | LangChain, not LangGraph, for the agent | Accepted | Owner | 2026-09-16 |
 | [D-029](#d-029) | Block note editor on Tiptap, stored as its JSON tree | Accepted | Engineering | 2026-09-16 |
 | [D-030](#d-030) | Rewrite and grade only when retrieval is uncertain | Accepted | Owner | 2026-09-16 |
-| [D-031](#d-031) | Fall back to the fast model when the answer model is unavailable | Accepted | Engineering | 2026-09-16 |
+| [D-031](#d-031) | Fall back to the fast model when the answer model is unavailable | Superseded by D-032 | Engineering | 2026-09-16 |
+| [D-032](#d-032) | Run on the Gemini free tier with a model chain and cooldowns | Accepted | Owner | 2026-09-16 |
 
 ---
 
@@ -418,7 +419,7 @@ Each of these closes a gap the UI or the guardrails need.
 
 - **Context.** During live testing on 2026-09-16, `gemini-3.5-flash` returned `504 DEADLINE_EXCEEDED` for every call while `gemini-3.5-flash-lite` answered in about a second. The gateway allowed 60 seconds per call and three attempts, so one question held the request open for minutes before failing.
 - **Decision.**
-  - Every model call has a hard 20-second deadline (`LLM_TIMEOUT_SECONDS`).
+  - Every model call has a hard deadline, 15 seconds since [D-032](#d-032) (`LLM_TIMEOUT_SECONDS`).
   - The answer model gets one try. If it fails or times out, the same call goes to the fast model, with the normal three attempts.
   - Calls that already use the fast model keep three attempts, with no fallback.
   - Fallback answers are not cached under the answer model's key, so the next question tries the answer model again.
@@ -426,3 +427,20 @@ Each of these closes a gap the UI or the guardrails need.
 - **Consequences.**
   - `agent_answers.model` records the model that actually answered, so fallbacks are visible in the review queue and in Gate G1 results.
   - Golden-set runs should check that model column: a run answered mostly by the fast model is not a fair measure of the answer model.
+
+## D-032
+
+**Run on the Gemini free tier with a model chain and cooldowns**
+
+- **Context.** The owner is using a free Gemini API key. During live testing, `gemini-3.5-flash` hit its free-tier limit of 20 requests a day (`429 RESOURCE_EXHAUSTED`). The free-tier models also returned `504 DEADLINE_EXCEEDED` after about 20 seconds at busy times. One question makes one to four model calls, so a single model's free quota covers only a handful of questions a day. D-031's single fallback still waited on the failing model for every call.
+- **Decision.**
+  - Each generation call walks a chain of models: the requested model, then `GEMINI_FALLBACK_MODELS` (default `gemini-3-flash-preview`), then the other Week 1 model. Fallbacks come before the other model, so grading does not spend the answer model's quota and answers prefer a full model to the lite one.
+  - Each model gets one try with a 15-second deadline.
+  - A model that fails is skipped for a cooldown: the wait a quota error names, otherwise 120 seconds. If every model is cooling down, the one that recovers first is tried.
+  - Only answers from the requested model are cached.
+  - Embeddings keep a single model with retries, because a different embedding model would not match the stored vectors.
+- **Why.** Free-tier limits are counted per model, so a chain multiplies the usable daily quota at no cost. The cooldown turns a 15-to-20-second wait on every call into a one-off cost.
+- **Consequences.**
+  - Answer quality can vary within a session. `agent_answers.model` records the model that answered.
+  - Golden-set and Gate G1 runs should report the models used. Running the full golden set in one sitting may exhaust the free quota; spread it out, or use a paid key for the measured run.
+  - The p50 target under 8 seconds is not reliable on the free tier, because Google deprioritises free traffic at busy times.

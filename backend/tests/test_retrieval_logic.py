@@ -134,23 +134,27 @@ def test_compose_answer_places_markers_from_sources_before_final_punctuation():
     assert compose_answer(data) == "Rectifiers are inspected every six months [2][1]. Batteries last four years [3] No source here."
 
 
-def test_gateway_falls_back_to_the_fast_model_when_the_answer_model_fails():
+def test_gateway_falls_back_along_the_chain_and_skips_a_cooling_model():
     from app.core.config import get_settings
     from app.llm.gateway import ModelGateway
 
     settings = get_settings()
     calls: list[str] = []
 
-    class FlakyProvider:
+    class QuotaProvider:
         async def generate(self, *, model, **_):
             calls.append(model)
             if model == settings.gemini_answer_model:
-                raise RuntimeError("504 DEADLINE_EXCEEDED")
-            return "ok"
+                raise RuntimeError("429 RESOURCE_EXHAUSTED. Please retry in 46.08s.")
+            return f"from {model}"
 
         async def embed(self, **_):
             return []
 
-    result = asyncio.run(ModelGateway(FlakyProvider()).generate(system="s", parts=["p"]))
-    assert result.text == "ok" and result.model == settings.gemini_fast_model
-    assert calls == [settings.gemini_answer_model, settings.gemini_fast_model]
+    fallback = settings.gemini_fallback_models.split(",")[0].strip()
+    gateway = ModelGateway(QuotaProvider())
+    first = asyncio.run(gateway.generate(system="s", parts=["one"]))
+    second = asyncio.run(gateway.generate(system="s", parts=["two"]))
+    assert first.model == second.model == fallback
+    # The quota error puts the answer model on a cooldown, so the second call skips it.
+    assert calls == [settings.gemini_answer_model, fallback, fallback]

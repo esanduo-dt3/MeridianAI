@@ -9,6 +9,11 @@ The response cache is in-process and keyed on the exact request, so repeating an
 identical question (demo pre-warming, a retry after a network blip) costs no model
 call. Embeddings are cached the same way because they are deterministic.
 
+Generation walks a chain of models: the requested one, then the other Week 1
+model, then the configured fallbacks. A model that fails (a quota 429, a 504, a
+timeout) is put on a cooldown, so later calls go straight to a model that is
+working instead of waiting on the failing one again (D-031, D-032).
+
 Content isolation (non-negotiable 2) is enforced by the call shape, not by
 convention: `generate` takes the system instruction and the user-turn parts as
 separate arguments. Callers pass document text only inside the user-turn data
@@ -22,6 +27,8 @@ import hashlib
 import json
 import logging
 import math
+import re
+import time
 from collections import OrderedDict
 from dataclasses import dataclass
 from functools import lru_cache
@@ -147,6 +154,7 @@ class ModelGateway:
         self._settings = settings
         self._responses = _LRU(settings.response_cache_entries)
         self._embeddings = _LRU(settings.response_cache_entries * 4)
+        self._cooling: dict[str, float] = {}
 
     async def _with_retry(self, label: str, call, attempts: int = 3):
         delay = 0.8
@@ -161,6 +169,23 @@ class ModelGateway:
                 await asyncio.sleep(delay)
                 delay *= 2
 
+    def _chain(self, primary: str) -> list[str]:
+        """The requested model, then the fallbacks, then the other Week 1 model.
+
+        Fallbacks come before the other model so that grading calls do not spend
+        the answer model's quota, and answers prefer a full model to the lite one.
+        """
+        s = self._settings
+        fallbacks = [m.strip() for m in s.gemini_fallback_models.split(",")]
+        other = s.gemini_answer_model if primary == s.gemini_fast_model else s.gemini_fast_model
+        return list(dict.fromkeys(m for m in [primary, *fallbacks, other] if m))
+
+    def _cool_down(self, model: str, exc: BaseException) -> None:
+        # Quota errors say how long to wait ("retry in 46.08s"); use that when given.
+        match = re.search(r"retry in ([\d.]+)s", str(exc))
+        seconds = float(match.group(1)) if match else self._settings.model_cooldown_seconds
+        self._cooling[model] = time.monotonic() + min(seconds, 3600)
+
     async def generate(
         self,
         *,
@@ -172,29 +197,37 @@ class ModelGateway:
         json_schema: dict | None = None,
     ) -> Generation:
         primary = self._settings.gemini_fast_model if fast else self._settings.gemini_answer_model
-        fallback = self._settings.gemini_fast_model if primary != self._settings.gemini_fast_model else None
         key = _key("generate", primary, system, parts, max_tokens, temperature, json_schema)
         cached = self._responses.get(key)
         if cached is not None:
             return Generation(text=cached, model=primary, cached=True)
 
-        def call(model: str):
-            return lambda: self._provider.generate(
-                model=model, system=system, parts=parts, max_tokens=max_tokens, temperature=temperature, json_schema=json_schema
-            )
-
-        try:
-            # With a fallback available, one try is enough: an overloaded model
-            # rarely recovers within the seconds a person is waiting.
-            text = await self._with_retry(f"generate:{primary}", call(primary), attempts=1 if fallback else 3)
-        except ModelError:
-            if fallback is None:
-                raise
-            log.warning("generate:%s unavailable, falling back to %s", primary, fallback)
-            text = await self._with_retry(f"generate:{fallback}", call(fallback))
-            return Generation(text=text, model=fallback)
-        self._responses.put(key, text)
-        return Generation(text=text, model=primary)
+        now = time.monotonic()
+        chain = self._chain(primary)
+        ready = [m for m in chain if self._cooling.get(m, 0) <= now]
+        # If every model is cooling down, try the one that recovers first.
+        order = ready or [min(chain, key=lambda m: self._cooling.get(m, 0))]
+        error: ModelError | None = None
+        for model in order:
+            try:
+                text = await self._with_retry(
+                    f"generate:{model}",
+                    lambda model=model: self._provider.generate(
+                        model=model, system=system, parts=parts, max_tokens=max_tokens, temperature=temperature, json_schema=json_schema
+                    ),
+                    attempts=1,
+                )
+            except ModelError as exc:
+                self._cool_down(model, exc.__cause__ or exc)
+                error = exc
+                continue
+            self._cooling.pop(model, None)
+            if model == primary:
+                self._responses.put(key, text)
+            else:
+                log.warning("generate:%s unavailable, answered by %s", primary, model)
+            return Generation(text=text, model=model)
+        raise error or ModelError(f"generate:{primary} failed")
 
     async def embed(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
         if not texts:

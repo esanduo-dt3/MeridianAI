@@ -23,11 +23,15 @@ class Settings(BaseSettings):
     # Gemini 3 models think before answering by default, which costs latency and
     # output tokens. "minimal" keeps structured answers fast (D-026).
     gemini_thinking_level: str = "minimal"
+    # Tried after the answer and fast models, comma separated. The free tier
+    # limits requests per model per day, so a chain of models goes further (D-032).
+    gemini_fallback_models: str = "gemini-3-flash-preview"
     gemini_embed_model: str = "gemini-embedding-001"
     embed_dim: int = 1536                                # must match chunk_embeddings.embedding
-    # A hard deadline per model call. A slow or overloaded answer model falls
-    # back to the fast model instead of holding the request open (D-031).
-    llm_timeout_seconds: float = 20.0
+    # A hard deadline per model call. A model that times out or hits its quota
+    # is skipped for a cooldown and the next model in the chain is used (D-031, D-032).
+    llm_timeout_seconds: float = 15.0
+    model_cooldown_seconds: float = 120.0
     response_cache_entries: int = 512                    # in-process cache of identical model calls
 
     # --- Reranking ---
