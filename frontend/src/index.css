@@ -8,7 +8,13 @@
   Direction: a survey instrument, not a chat toy. Cool mineral paper, black ink,
   one cobalt accent for action and location, and a highlighter wash reserved
   exclusively for cited source passages.
+
+  Colours are defined once here (light) and redefined for dark under
+  [data-theme='dark']. The attribute is set before first paint by the inline
+  script in index.html and kept in sync by ThemeProvider.
 */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @theme {
   --font-display: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
@@ -18,6 +24,8 @@
   --color-surface: #ffffff;
   --color-sunken: #eceee9;
   --color-ink: #111418;
+  --color-ink-hover: #252a31;
+  --color-on-ink: #ffffff;
   --color-ink-2: #454d57;
   --color-ink-3: #69717b;
   --color-rule: #e1e4df;
@@ -43,8 +51,45 @@
 
   --shadow-panel: 0 1px 0 rgb(17 20 24 / 0.04), 0 8px 24px -12px rgb(39 67 201 / 0.12);
   --shadow-lift: 0 1px 0 rgb(17 20 24 / 0.05), 0 18px 40px -18px rgb(17 20 24 / 0.22);
+  --shadow-control: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 1px 2px rgb(17 20 24 / 0.2);
+  --shadow-hairline: 0 1px 0 rgb(17 20 24 / 0.04);
 
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Dark: near-black graphite, not pure black; accents lifted for contrast. */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-paper: #0d0f12;
+  --color-surface: #15181c;
+  --color-sunken: #1c2025;
+  --color-ink: #eceef1;
+  --color-ink-hover: #ffffff;
+  --color-on-ink: #0d0f12;
+  --color-ink-2: #b4bac2;
+  --color-ink-3: #8b939d;
+  --color-rule: #252a30;
+  --color-rule-strong: #343a42;
+
+  --color-cobalt: #8098ff;
+  --color-cobalt-hover: #a0b2ff;
+  --color-cobalt-wash: #1b2244;
+
+  --color-mark: #5b4a0f;
+  --color-mark-edge: #8c7422;
+
+  --color-grounded: #52c58e;
+  --color-grounded-wash: #11281d;
+  --color-flag: #f0a64a;
+  --color-flag-wash: #2d2011;
+  --color-danger: #ff7d74;
+  --color-danger-wash: #3a1614;
+
+  --shadow-panel: 0 1px 0 rgb(0 0 0 / 0.35), 0 10px 28px -14px rgb(0 0 0 / 0.7);
+  --shadow-lift: 0 1px 0 rgb(0 0 0 / 0.4), 0 24px 48px -20px rgb(0 0 0 / 0.8);
+  --shadow-control: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-hairline: 0 1px 0 rgb(0 0 0 / 0.3);
 }
 
 @layer base {

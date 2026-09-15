@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../auth/AuthProvider'
 import { ReliabilityNote } from '../components/ReliabilityNote'
 import { Wordmark } from '../components/Wordmark'
+import { ThemeToggle } from '../theme/ThemeToggle'
 
 interface NavItem {
   to: string
@@ -61,7 +62,7 @@ export function AppShell() {
     <div className="min-h-dvh lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
       <a
         href="#main"
-        className="sr-only z-50 rounded-md bg-ink px-3 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+        className="sr-only z-50 rounded-md bg-ink px-3 py-2 text-on-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
       >
         Skip to content
       </a>
@@ -96,7 +97,7 @@ export function AppShell() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0 cursor-default bg-ink/45"
+              className="absolute inset-0 cursor-default bg-black/50"
             />
             <motion.aside
               initial={reduce ? { opacity: 0 } : { x: '-100%' }}
@@ -153,6 +154,7 @@ function Sidebar({ layoutGroup, onNavigate }: SidebarProps) {
 
       <div className="flex flex-col gap-4 border-t border-rule px-3 pt-4">
         <ReliabilityNote compact />
+        <ThemeToggle className="self-start" />
         <UserMenu />
       </div>
     </div>
@@ -171,7 +173,7 @@ function NavGroup({ label, items, layoutGroup, onNavigate }: SidebarProps & { la
               onClick={onNavigate}
               className={({ isActive }) =>
                 `group relative flex min-h-10 items-center gap-3 rounded-(--radius-control) px-3 text-[14.5px] transition-colors duration-150 ${
-                  isActive ? 'bg-surface font-medium text-ink shadow-[0_1px_0_rgb(17_20_24/0.04)]' : 'text-ink-2 hover:bg-sunken hover:text-ink'
+                  isActive ? 'bg-surface font-medium text-ink shadow-(--shadow-hairline)' : 'text-ink-2 hover:bg-sunken hover:text-ink'
                 }`
               }
             >

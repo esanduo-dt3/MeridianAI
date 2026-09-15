@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { Button } from '../components/Button'
 import { CitationSpecimen } from '../components/CitationSpecimen'
 import { Wordmark } from '../components/Wordmark'
+import { ThemeToggle } from '../theme/ThemeToggle'
 import { missingSupabaseConfig } from '../lib/supabaseClient'
 
 export function SignIn() {
@@ -59,7 +60,10 @@ export function SignIn() {
     <div className="min-h-dvh px-5 sm:px-8">
       <div className="mx-auto grid min-h-dvh max-w-[1240px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16">
         <main className="flex flex-col py-8 lg:py-10">
-          <Wordmark size="md" />
+          <div className="flex items-center justify-between gap-4">
+            <Wordmark size="md" />
+            <ThemeToggle className="lg:hidden" />
+          </div>
 
           <motion.div
             initial={reduce ? false : { opacity: 0, y: 16 }}
@@ -136,6 +140,7 @@ export function SignIn() {
           className="relative hidden items-center justify-center py-10 lg:flex"
         >
           <div aria-hidden className="absolute inset-y-10 left-0 w-px bg-rule" />
+          <ThemeToggle className="absolute top-8 right-0" />
           <CitationSpecimen />
         </section>
       </div>

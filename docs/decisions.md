@@ -23,6 +23,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-014](#d-014) | Backend runs on Python 3.13 | Accepted | Engineering | 2026-09-15 |
 | [D-015](#d-015) | Plain SQL migrations applied with psql, tested locally | Accepted | Engineering | 2026-09-15 |
 | [D-016](#d-016) | Visual direction for the product UI | Accepted | Engineering | 2026-09-15 |
+| [D-017](#d-017) | Light and dark themes with a system default | Accepted | Owner | 2026-09-15 |
 
 ---
 
@@ -206,3 +207,15 @@ Each of these closes a gap the UI or the guardrails need.
   - **Signature.** The "meridian" line: a cobalt rule that marks the current page in navigation and connects an answer to its source.
   - **Enforced in code.** Confidence values can only be rendered through `ConfidenceLabel`, which always shows "uncalibrated" (non-negotiable 3).
 - **Details.** See [design/design-system.md](design/design-system.md).
+
+## D-017
+
+**Light and dark themes with a system default**
+
+- **Context.** The owner asked for both light and dark themes, with a toggle.
+- **Decision.**
+  - Both themes are built from the same colour tokens; dark redefines each one under `[data-theme='dark']`.
+  - The default follows the operating system.
+  - A three-way control (System, Light, Dark) is in the sidebar and on the sign-in page, and the choice is stored locally in the browser.
+  - The theme is applied before the first paint, so there is no flash of the wrong theme.
+- **Consequences.** Components must use theme tokens only. Colours are chosen to keep text at WCAG AA contrast in both themes. See [design/design-system.md](design/design-system.md#dark-theme).

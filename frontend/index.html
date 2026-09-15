@@ -6,6 +6,17 @@
     <meta name="theme-color" content="#f4f5f2" />
     <meta name="description" content="Meridian: a workspace where every AI answer cites the exact passage it came from." />
     <title>Meridian</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash. Mirrors ThemeProvider.
+      ;(function () {
+        var stored = null
+        try {
+          stored = localStorage.getItem('meridian-theme')
+        } catch (e) {}
+        var dark = stored === 'dark' || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>
