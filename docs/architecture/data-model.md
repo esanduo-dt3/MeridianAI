@@ -38,10 +38,10 @@ erDiagram
 ## Content
 
 **`documents`**
-`id` · `workspace_id` · `uploaded_by` · `file_path` (storage path `{workspace_id}/{document_id}/{file_name}`) · `file_name`, `mime_type`, `size_bytes`, `parse_error` ([D-011](../decisions.md#d-011)) · `parsed_status` (`pending`, `processing`, `ready`, `failed`) · `created_at` · `doc_type` (`pdf`, `docx`), `content_text` (canonical extracted text; chunk offsets index into it), `page_count`, `chunk_count`, `parse_stats`, `content_hash` (unique per workspace), `processed_at` ([D-023](../decisions.md#d-023))
+`id` · `workspace_id` · `uploaded_by` · `file_path` (storage path `{workspace_id}/{document_id}/{file_name}`) · `file_name`, `mime_type`, `size_bytes`, `parse_error` ([D-011](../decisions.md#d-011)) · `parsed_status` (`pending`, `processing`, `ready`, `failed`) · `created_at` · `doc_type` (`pdf`, `docx`), `content_text` (canonical extracted text; chunk offsets index into it), `page_count`, `chunk_count`, `parse_stats`, `content_hash` (unique per workspace), `processed_at` ([D-023](../decisions.md#d-023)) · `processing_stage` (`parsing`, `embedding`, or null when not processing), `embedded_count` ([D-034](../decisions.md#d-034))
 
 **`chunks`**
-`id` · `document_id` · `workspace_id`, `chunk_index` ([D-008](../decisions.md#d-008)) · `content` (always `documents.content_text[char_start:char_end]`) · `char_start`, `char_end` · `embedding_ref` → `chunk_embeddings` · `created_at` · `kind` (`text`, `table`, `code`), `section`, `page`, `token_count`, `context` (heading path and table header; embedded but not cited) · `search_tsv` (generated, weighted `context` + `content`, the keyword signal) ([D-023](../decisions.md#d-023), [D-025](../decisions.md#d-025))
+`id` · `document_id` · `workspace_id`, `chunk_index` ([D-008](../decisions.md#d-008)) · `content` (always `documents.content_text[char_start:char_end]`) · `char_start`, `char_end` · `embedding_ref` → `chunk_embeddings` (null until the chunk is embedded; chunks are saved before embedding, [D-034](../decisions.md#d-034)) · `created_at` · `kind` (`text`, `table`, `code`), `section`, `page`, `token_count`, `context` (heading path and table header; embedded but not cited) · `search_tsv` (generated, weighted `context` + `content`, the keyword signal) ([D-023](../decisions.md#d-023), [D-025](../decisions.md#d-025))
 
 **`chunk_embeddings`** ([D-005](../decisions.md#d-005))
 `id` · `workspace_id` · `document_id` (cascade delete) · `model` (e.g. `gemini-embedding-001@1536`) · `embedding vector(1536)`, unit length, HNSW cosine index · `created_at`

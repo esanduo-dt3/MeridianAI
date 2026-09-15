@@ -142,6 +142,19 @@ check "anonymous users cannot run search" anon fail "select * from public.match_
 check "members cannot write chunks directly" "$E" fail "insert into public.chunks (document_id, workspace_id, chunk_index, content, char_start, char_end) values ('$D1', '$W', 9, 'x', 0, 1)"
 check "members read the extracted document text" "$E" "=45" "select length(content_text) from public.documents where id = '$D1'"
 
+echo "Ingestion progress: passages preview before embedding, search waits for ready"
+check "a document still embedding is not searchable" service "=1" "update public.documents set parsed_status = 'processing', processing_stage = 'embedding' where id = '$D2' returning 1"
+check "keyword search skips the document that is still embedding" "$E" "=1" "select count(*) from public.match_chunks_sparse('$W', 'rectifier')"
+check "members still preview its passages" "$E" "=1" "select count(*) from public.chunks where document_id = '$D2'"
+EMB="$(value_as service "insert into public.chunk_embeddings (workspace_id, document_id, model, embedding) values ('$W', '$D2', 'test@3', '{0,0,1}') returning id")"
+CH2="$(value_as service "select id from public.chunks where document_id = '$D2'")"
+check "members cannot attach embeddings" "$E" fail "select public.attach_chunk_embeddings('$D2', '[{\"chunk_id\": \"$CH2\", \"embedding_id\": \"$EMB\"}]')"
+check "attaching a batch returns the embedded count" service "=1" "select public.attach_chunk_embeddings('$D2', '[{\"chunk_id\": \"$CH2\", \"embedding_id\": \"$EMB\"}]')"
+check "the document records its embedded count" "$E" "=1|true" "select d.embedded_count || '|' || (c.embedding_ref = '$EMB') from public.documents d join public.chunks c on c.document_id = d.id where d.id = '$D2'"
+check "attach ignores chunks of another document" service "=0" "select public.attach_chunk_embeddings('$D1', '[{\"chunk_id\": \"$CH2\", \"embedding_id\": \"$EMB\"}]')"
+check "the document is marked ready" service "=ready" "update public.documents set parsed_status = 'ready', processing_stage = null where id = '$D2' returning parsed_status"
+check "the document is searchable once ready" "$E" "=2" "select count(*) from public.match_chunks_sparse('$W', 'rectifier')"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

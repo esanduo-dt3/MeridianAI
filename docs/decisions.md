@@ -40,6 +40,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-031](#d-031) | Fall back to the fast model when the answer model is unavailable | Superseded by D-032 | Engineering | 2026-09-16 |
 | [D-032](#d-032) | Run on the Gemini free tier with a model chain and cooldowns | Accepted | Owner | 2026-09-16 |
 | [D-033](#d-033) | Pace document embedding under the free-tier quota | Accepted | Engineering | 2026-09-16 |
+| [D-034](#d-034) | Preview passages before embedding finishes | Accepted | Owner | 2026-09-16 |
 
 ---
 
@@ -462,3 +463,20 @@ Each of these closes a gap the UI or the guardrails need.
   - The window is per server process. Several processes sharing one key would need a shared limiter.
   - For a paid key, raise `EMBED_REQUESTS_PER_MINUTE`.
   - Verified live: the 159-chunk document was reprocessed to ready in 73 seconds with all 159 embeddings stored.
+
+## D-034
+
+**Preview passages before embedding finishes**
+
+- **Context.** The owner wants to see the chunks a document was split into before vectorisation completes. On the free tier, embedding a large document takes a minute or more ([D-033](#d-033)), and until now passages were saved only after every embedding succeeded.
+- **Decision.** The owner chose a live preview over a manual approval step:
+  - Ingestion saves the canonical text and every chunk as soon as the document is chunked, then embeds in batches.
+  - `documents.processing_stage` (`parsing`, `embedding`) and `documents.embedded_count` record progress. After each batch, `attach_chunk_embeddings` links the batch's chunks to their embeddings and refreshes the count.
+  - The Documents list shows "Embedding 100/159" with a progress bar and a Preview link. The viewer lists every passage with a short preview, marks passages not yet embedded, and shows a progress banner.
+  - Both search functions return passages only from documents whose status is `ready`, so a half-embedded document is never partly searchable.
+  - A failed document keeps the passages saved before the failure, marked failed and not searchable, until it is reprocessed or deleted.
+- **Why.** Showing the passages early lets an Admin check the chunking of a large file straight away without adding a step to every upload. Gating search on `ready` keeps retrieval results consistent.
+- **Consequences.**
+  - Migration `20260916130000_ingestion_progress` adds the two columns and the function, and redefines both search functions.
+  - `GET /documents/{id}` returns chunks during processing, each with `embedded`.
+  - Verified live on the 159-chunk document: passages were visible about 2 seconds after parsing, 100 embedded at 23 seconds, ready at 80 seconds.

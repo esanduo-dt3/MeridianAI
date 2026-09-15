@@ -1,15 +1,20 @@
 """Ingestion: parse, chunk, embed, store (docs/decisions.md D-022, D-023, D-025).
 
 Runs in the background after the upload request returns, and reports progress
-through documents.parsed_status (pending, processing, ready, failed) so the
+through documents.parsed_status (pending, processing, ready, failed), with
+processing_stage (parsing, embedding) and embedded_count while it runs, so the
 Documents page can show it.
+
+Passages are saved as soon as the document is chunked, before embedding, so they
+can be previewed while embeddings are written batch by batch (D-034).
 
 Every row written carries the document's workspace_id: the workspace is the
 search namespace. Writes use the service role because users may not write
 chunks directly; the API has already checked the uploader is an Admin.
 
-A failure leaves no half-indexed document: any chunks and embeddings written so
-far are deleted and the document is marked failed with a readable reason.
+A failure never leaves a half-indexed document searchable: search only reads
+documents marked ready. The document is marked failed with a readable reason, and
+its saved passages stay visible until it is reprocessed or deleted.
 """
 
 from __future__ import annotations
@@ -59,7 +64,12 @@ async def process_document(*, document_id: str, workspace_id: str, file_name: st
 async def _process(db: Db, *, document_id: str, workspace_id: str, file_name: str, doc_type: str, data: bytes) -> None:
     started = time.perf_counter()
     try:
-        await db.update("documents", {"id": f"eq.{document_id}"}, {"parsed_status": "processing", "parse_error": None}, select="id")
+        await db.update(
+            "documents",
+            {"id": f"eq.{document_id}"},
+            {"parsed_status": "processing", "processing_stage": "parsing", "parse_error": None, "embedded_count": 0, "chunk_count": 0},
+            select="id",
+        )
         await _clear_chunks(db, document_id)
         try:
             text, chunks, stats, pages = await to_thread.run_sync(_parse_and_chunk, doc_type, data, file_name)
@@ -72,42 +82,20 @@ async def _process(db: Db, *, document_id: str, workspace_id: str, file_name: st
                 raise IngestFailure("No text was found. The PDF looks scanned, and scanned pages aren't supported yet.")
             raise IngestFailure("No readable text was found in this document.")
 
-        try:
-            vectors = await get_gateway().embed([c.embed_text for c in chunks], "document")
-        except QuotaExceeded as exc:
-            if exc.daily:
-                raise IngestFailure("The daily Gemini embedding quota is used up. Reprocess this document tomorrow, or use a paid key.") from exc
-            raise IngestFailure("The Gemini embedding quota was busy. Wait a minute, then reprocess this document.") from exc
-        except ModelError as exc:
-            raise IngestFailure("Embedding failed because the model provider returned an error. Try reprocessing.") from exc
-
-        settings = get_settings()
-        embedding_ids = [str(uuid.uuid4()) for _ in chunks]
-        await db.insert_many(
-            "chunk_embeddings",
-            [
-                {
-                    "id": embedding_ids[i],
-                    "workspace_id": workspace_id,
-                    "document_id": document_id,
-                    "model": f"{settings.gemini_embed_model}@{settings.embed_dim}",
-                    "embedding": _vector_literal(vectors[i]),
-                }
-                for i in range(len(chunks))
-            ],
-            batch=40,
-        )
+        # Save the passages before embedding so they can be previewed while it runs
+        # (D-034). Search ignores the document until it is ready.
+        chunk_ids = [str(uuid.uuid4()) for _ in chunks]
         await db.insert_many(
             "chunks",
             [
                 {
+                    "id": chunk_ids[i],
                     "document_id": document_id,
                     "workspace_id": workspace_id,
                     "chunk_index": chunk.index,
                     "content": chunk.text,
                     "char_start": chunk.start,
                     "char_end": chunk.end,
-                    "embedding_ref": embedding_ids[i],
                     "kind": chunk.kind,
                     "section": chunk.section,
                     "page": chunk.page,
@@ -126,7 +114,54 @@ async def _process(db: Db, *, document_id: str, workspace_id: str, file_name: st
                 "page_count": pages or None,
                 "chunk_count": len(chunks),
                 "parse_stats": stats,
+                "processing_stage": "embedding",
+            },
+            select="id",
+        )
+
+        settings = get_settings()
+        gateway = get_gateway()
+        model_label = f"{settings.gemini_embed_model}@{settings.embed_dim}"
+        batch_size = max(1, min(settings.embed_batch_size, settings.embed_requests_per_minute))
+        for first in range(0, len(chunks), batch_size):
+            indexes = range(first, min(first + batch_size, len(chunks)))
+            try:
+                vectors = await gateway.embed([chunks[i].embed_text for i in indexes], "document")
+            except QuotaExceeded as exc:
+                if exc.daily:
+                    raise IngestFailure("The daily Gemini embedding quota is used up. Reprocess this document tomorrow, or use a paid key.") from exc
+                raise IngestFailure("The Gemini embedding quota was busy. Wait a minute, then reprocess this document.") from exc
+            except ModelError as exc:
+                raise IngestFailure("Embedding failed because the model provider returned an error. Try reprocessing.") from exc
+            embedding_ids = [str(uuid.uuid4()) for _ in indexes]
+            await db.insert_many(
+                "chunk_embeddings",
+                [
+                    {
+                        "id": embedding_id,
+                        "workspace_id": workspace_id,
+                        "document_id": document_id,
+                        "model": model_label,
+                        "embedding": _vector_literal(vector),
+                    }
+                    for embedding_id, vector in zip(embedding_ids, vectors)
+                ],
+                batch=40,
+            )
+            await db.rpc(
+                "attach_chunk_embeddings",
+                {
+                    "p_document_id": document_id,
+                    "p_pairs": [{"chunk_id": chunk_ids[i], "embedding_id": e} for i, e in zip(indexes, embedding_ids)],
+                },
+            )
+
+        await db.update(
+            "documents",
+            {"id": f"eq.{document_id}"},
+            {
                 "parsed_status": "ready",
+                "processing_stage": None,
                 "parse_error": None,
                 "processed_at": datetime.now(timezone.utc).isoformat(),
             },
@@ -148,9 +183,13 @@ async def _process(db: Db, *, document_id: str, workspace_id: str, file_name: st
         if not isinstance(exc, IngestFailure):
             log.exception("ingestion failed for %s", document_id)
         try:
-            await _clear_chunks(db, document_id)
+            # Passages already saved stay visible so the failure can be inspected;
+            # search ignores a failed document, and reprocessing clears them.
             await db.update(
-                "documents", {"id": f"eq.{document_id}"}, {"parsed_status": "failed", "parse_error": reason}, select="id"
+                "documents",
+                {"id": f"eq.{document_id}"},
+                {"parsed_status": "failed", "processing_stage": None, "parse_error": reason},
+                select="id",
             )
             await audit.record(
                 db,

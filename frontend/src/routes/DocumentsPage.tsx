@@ -19,6 +19,8 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorState, Skeleton } from '../components/Feedback'
 import { SelectField } from '../components/Field'
 import { PageHeader } from '../components/PageHeader'
+import { ProgressBar } from '../documents/IngestProgress'
+import { embeddingFraction, stageLabel } from '../documents/ingestState'
 import { useDocumentMutations, useDocuments } from '../documents/useDocuments'
 import { formatBytes } from '../lib/format'
 import { errorText } from '../lib/queryClient'
@@ -182,7 +184,7 @@ function StatusBadge({ doc }: { doc: DocumentSummary }) {
       return (
         <span className="inline-flex items-center gap-1 rounded-full bg-cobalt-wash px-2 py-0.5 text-xs font-medium text-cobalt">
           <CircleNotch aria-hidden size={13} weight="bold" className="animate-spin" />
-          {doc.parsed_status === 'pending' ? 'Queued' : 'Processing'}
+          <span className="tabular">{stageLabel(doc)}</span>
         </span>
       )
   }
@@ -197,11 +199,14 @@ function DocumentList({ docs }: { docs: DocumentSummary[] }) {
     <section aria-labelledby="documents-heading">
       <h2 id="documents-heading" className="mb-3 text-sm font-medium text-ink-2">
         {docs.length} {docs.length === 1 ? 'document' : 'documents'} ·{' '}
-        {docs.filter((d) => d.parsed_status === 'ready').reduce((sum, d) => sum + d.chunk_count, 0)} passages indexed
+        {docs.filter((d) => d.parsed_status === 'ready').reduce((sum, d) => sum + d.chunk_count, 0)} passages searchable
       </h2>
       <ul className="divide-y divide-rule overflow-hidden rounded-(--radius-panel) border border-rule bg-surface">
         {docs.map((doc) => {
           const Icon = doc.doc_type === 'pdf' ? FilePdf : FileText
+          // Passages can be previewed as soon as they are saved, before embedding finishes.
+          const inspectable = doc.chunk_count > 0 && doc.parsed_status !== 'pending'
+          const embedding = doc.parsed_status === 'processing' && doc.processing_stage === 'embedding'
           return (
             <li key={doc.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 sm:px-5">
               <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-sunken text-ink-2">
@@ -209,7 +214,7 @@ function DocumentList({ docs }: { docs: DocumentSummary[] }) {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  {doc.parsed_status === 'ready' ? (
+                  {inspectable ? (
                     <Link to={`/documents/${doc.id}`} className="truncate font-medium text-ink hover:text-cobalt hover:underline">
                       {doc.file_name}
                     </Link>
@@ -222,25 +227,28 @@ function DocumentList({ docs }: { docs: DocumentSummary[] }) {
                   {[
                     formatBytes(doc.size_bytes),
                     doc.page_count ? `${doc.page_count} ${doc.page_count === 1 ? 'page' : 'pages'}` : null,
-                    doc.parsed_status === 'ready' ? `${doc.chunk_count} passages` : null,
+                    doc.chunk_count > 0 ? `${doc.chunk_count} passages` : null,
                     doc.uploaded_by ? `by ${doc.uploaded_by.full_name || doc.uploaded_by.email}` : null,
                     dateFormat.format(new Date(doc.created_at)),
                   ]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>
+                {embedding && (
+                  <ProgressBar value={embeddingFraction(doc)} label={`Embedding ${doc.file_name}`} className="mt-2 max-w-sm" />
+                )}
                 {doc.parsed_status === 'failed' && doc.parse_error && (
                   <p className="mt-1 text-sm text-danger">{doc.parse_error}</p>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                {doc.parsed_status === 'ready' && (
+                {inspectable && (
                   <Link
                     to={`/documents/${doc.id}`}
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-sm text-ink-2 hover:bg-sunken hover:text-ink"
                   >
                     <MagnifyingGlass aria-hidden size={16} weight="bold" />
-                    Inspect
+                    {doc.parsed_status === 'ready' ? 'Inspect' : 'Preview'}
                   </Link>
                 )}
                 {isAdmin && doc.parsed_status === 'failed' && (
