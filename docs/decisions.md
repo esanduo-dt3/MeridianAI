@@ -33,6 +33,8 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-024](#d-024) | PyMuPDF for PDF parsing, licence flagged | Accepted | Owner | 2026-09-16 |
 | [D-025](#d-025) | The workspace is the search namespace | Accepted | Owner | 2026-09-16 |
 | [D-026](#d-026) | Gemini behind a provider gateway, Voyage for reranking | Accepted | Owner | 2026-09-16 |
+| [D-027](#d-027) | Confidence formula and review flags | Accepted | Engineering | 2026-09-16 |
+| [D-028](#d-028) | LangChain, not LangGraph, for the agent | Accepted | Owner | 2026-09-16 |
 
 ---
 
@@ -347,3 +349,28 @@ Each of these closes a gap the UI or the guardrails need.
   - Without Voyage, retrieval falls back to fusion order plus an LLM grade, and confidence is reported as unavailable.
   - The response cache is per process. A shared cache for demo pre-warming is Day 5 work.
 
+## D-027
+
+**Confidence formula and review flags**
+
+- **Context.** The PRD defines confidence as a combination of the reranker score and the grading verdict, stated and uncalibrated.
+- **Decision.**
+  - **Formula:** `confidence = mean(rerank score of the cited passages) × (1.0 if the retrieval grade is good, else 0.6)`, rounded to 3 decimals.
+  - **Returned with:** `label: "uncalibrated"` and a plain-language basis.
+  - **Flag reasons.** An answer is flagged for the admin review queue when any of these apply:
+    - confidence below 0.35 (`review_confidence_threshold`);
+    - the groundedness check fails;
+    - an answerable reply has no valid citations;
+    - the documents cannot answer the question;
+    - a retrieved passage matched an injection pattern.
+- **Consequences.** Every flag reason is stored on `agent_answers.flag_reasons`, so the review queue can explain why an answer is there. The threshold is configuration and should be revisited once Gate G1 results exist.
+
+## D-028
+
+**LangChain, not LangGraph, for the agent**
+
+- **Context.** The PRD and kickoff prompt name LangGraph for agent orchestration.
+- **Decision.** The owner chose plain LangChain for the Week 1 agent, and will present the rationale.
+  - The agent's job is small: search the workspace, read tasks, and propose a task that is held for approval. A single tool-calling loop covers it.
+  - The retrieval loop (search, assess, rewrite once, retry) is plain Python with no orchestration framework.
+- **Consequences.** No graph state or checkpointer. Approval is handled by `agent_actions` rows and the atomic approve and reject functions ([D-009](#d-009)), not by pausing an agent.
