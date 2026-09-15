@@ -28,6 +28,8 @@ interface ApiInit extends Omit<RequestInit, 'body'> {
   body?: unknown
   /** Send the request without the active workspace header. */
   unscoped?: boolean
+  /** Send the request for a specific workspace instead of the active one. */
+  workspaceId?: string
 }
 
 /**
@@ -36,12 +38,13 @@ interface ApiInit extends Omit<RequestInit, 'body'> {
  * so the frontend never decides scope on its own.
  */
 export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> {
-  const { body, unscoped, ...rest } = init
+  const { body, unscoped, workspaceId, ...rest } = init
   const headers = new Headers(rest.headers)
   const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } }
   const token = data.session?.access_token
   if (token) headers.set('Authorization', `Bearer ${token}`)
-  if (activeWorkspaceId && !unscoped) headers.set('X-Workspace-Id', activeWorkspaceId)
+  const scope = workspaceId ?? activeWorkspaceId
+  if (scope && !unscoped) headers.set('X-Workspace-Id', scope)
 
   let payload: BodyInit | undefined
   if (body instanceof FormData) {
