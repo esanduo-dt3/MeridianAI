@@ -4,7 +4,7 @@ Newest first. Each entry states what exists, the verification recorded when that
 
 ## Current source-control status
 
-The active branch is `dev` at `4122c79` (`Merge feature/tasks into dev`), and it is aligned with `origin/dev`. The workspace and task feature work, along with the prior theme and sign-in fixes, are merged into and pushed on `dev`. The `main` branch remains at the initial repository baseline commit, `5766775`.
+`dev` is at `e9818ce` (`Merge feature/ingestion-preview into dev`) and is pushed to `origin/dev`. It now carries the free-tier embedding pacing ([D-033](decisions.md#d-033)) and the ingestion passage preview ([D-034](decisions.md#d-034)) on top of the earlier retrieval, notes, documents, tasks and workspace work. The Ask page is on `feature/ask-page`, not yet merged. The `main` branch remains at the initial repository baseline commit, `5766775`.
 
 ## Gate status
 
@@ -14,6 +14,25 @@ The active branch is `dev` at `4122c79` (`Merge feature/tasks into dev`), and it
 | G2: propose, approve and write round trip | End of Day 4 | Not yet run |
 
 ## Day 2 (2026-09-16)
+
+### Part 10: Ask page (committed on `feature/ask-page`)
+
+- **Built.** `/ask` is a working surface instead of a placeholder ([D-035](decisions.md#d-035)).
+  - A question box with the retrieval profile (lookup, explore, summarize); Enter asks, Shift+Enter starts a new line.
+  - The answer with its `[n]` markers as links into `/documents/{id}?chunk={chunk_id}`, which highlights the exact passage in the viewer. Hovering a marker outlines its passage card.
+  - The cited passages listed under the answer, each with file name, page, section, character range and excerpt.
+  - The three reliability signals together: the confidence value always labelled uncalibrated, the groundedness result, and each flag reason written out in plain language.
+  - "How this answer was retrieved": the model that actually answered, attempts, grade, top rerank score, latency and the run id, all read off the recorded run.
+  - Recent answers from `GET /agent/answers`, expandable. Their markers are plain text, because that endpoint does not return citation targets.
+  - The question box is withheld until a document reaches `ready`, since search only returns passages from ready documents.
+- **Verified.** `tsc --noEmit` clean, `eslint` clean, `vite build` succeeds. The TypeScript types were checked field by field against the live `/openapi.json` for `AskRequest`, `AskResponse`, `CitationOut`, `Confidence`, `RetrievalSummary` and `AnswerListItem`, and match. The citation-marker splitter was round-trip checked against six answer shapes, including repeated calls, a leading marker, a trailing marker, adjacent markers and bracketed prose that is not a marker.
+- **Not yet verified.** No browser run and no live question: signing in needs Google OAuth, and a measured run spends free-tier quota. The owner should ask one real question and click a citation through to the passage.
+- **Bug found and fixed during the build.** The marker splitter held a module-level `/g` regex, so `lastIndex` carried between renders and a second answer on the same page would have lost its first markers. The regex is now built per call, and the pure helpers moved to `agent/answerModel.ts`.
+
+### Part 9: Merged the embedding and preview branches into `dev`
+
+- `fix/embedding-rate-limit` then `feature/ingestion-preview` merged into `dev` and pushed as `e9818ce`.
+- **Verified after merging.** `pytest`: 63 passed. `vite build` succeeds.
 
 ### Part 8: Block note editor (committed on `feature/notes`)
 

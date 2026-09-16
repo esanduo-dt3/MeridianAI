@@ -41,6 +41,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-032](#d-032) | Run on the Gemini free tier with a model chain and cooldowns | Accepted | Owner | 2026-09-16 |
 | [D-033](#d-033) | Pace document embedding under the free-tier quota | Accepted | Engineering | 2026-09-16 |
 | [D-034](#d-034) | Preview passages before embedding finishes | Accepted | Owner | 2026-09-16 |
+| [D-035](#d-035) | The Ask page shows the whole reliability record of an answer | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -480,3 +481,22 @@ Each of these closes a gap the UI or the guardrails need.
   - Migration `20260916130000_ingestion_progress` adds the two columns and the function, and redefines both search functions.
   - `GET /documents/{id}` returns chunks during processing, each with `embedded`.
   - Verified live on the 159-chunk document: passages were visible about 2 seconds after parsing, 100 embedded at 23 seconds, ready at 80 seconds.
+
+## D-035
+
+**The Ask page shows the whole reliability record of an answer**
+
+- **Context.** `POST /agent/ask` already returns the answer, its citations, an uncalibrated confidence value, the groundedness result, the flag reasons and the retrieval run. The Ask surface was a placeholder, so none of it reached a person.
+- **Decision.**
+  - **Citation markers are links.** The backend writes `[n]` markers into the answer text and renumbers them 1..k, so each marker resolves to a citation on the same response. Each marker is a link to `/documents/{document_id}?chunk={chunk_id}`, the route the viewer already reads to highlight an exact passage. Hovering or focusing a marker outlines its passage card, and the passage cards link to the same place.
+  - **Stored answers keep their markers as plain text.** `GET /agent/answers` returns the answer text but not its citation targets, so markers in the recent-answers list are shown as written and are not links, rather than inventing a target.
+  - **Every answer carries its three signals together:** the confidence value through `ConfidenceLabel`, which always prints "uncalibrated"; the groundedness result as Grounded or Not grounded; and, when flagged, each flag reason written out in plain language.
+  - **The retrieval run is on the page**, behind "How this answer was retrieved": model, attempts, grade, top rerank score, whether it reranked, latency and the run id. A rewritten query is stated as such.
+  - **Asking is gated on a ready document.** With no document at status `ready`, the page keeps an empty state instead of a question box, because search returns passages only from ready documents ([D-034](#d-034)).
+  - **The retrieval profile is a control on the page** (lookup, explore, summarize), because the profile changes how many passages are read and whether grading runs.
+  - Enter asks and Shift+Enter starts a new line. A failed question is not retried automatically, because a question spends model quota ([D-032](#d-032)).
+- **Why.** The PRD's reliability requirement is only met if a person can check an answer, and checking means reaching the passage. Naming the model that answered matters on the free tier, where the gateway falls back across models and answer quality changes with it ([D-031](#d-031), [D-032](#d-032)).
+- **Consequences.**
+  - `AskPage` moves out of `routes/surfaces.tsx` into `routes/AskPage.tsx`; `surfaces.tsx` now holds only the admin placeholders.
+  - The review queue and audit views can reuse `AnswerSignals` and `AnswerText`, so a flagged answer reads the same in both places.
+  - The Ask page does not yet filter by document, although `POST /agent/ask` accepts `document_ids`.

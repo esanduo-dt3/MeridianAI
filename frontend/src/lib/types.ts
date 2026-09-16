@@ -162,3 +162,73 @@ export interface NoteSummary {
 export interface Note extends NoteSummary {
   content: BlockDoc
 }
+
+/*
+  Agent answers (backend/app/api/ask.py). A confidence value is always carried
+  with its label, so the UI can never render a bare number as a probability.
+*/
+
+export type RetrievalProfile = 'lookup' | 'explore' | 'summarize'
+
+export interface Confidence {
+  /** Null when no cited passage carried a rerank score. */
+  value: number | null
+  label: 'uncalibrated'
+  basis: string
+}
+
+/** One [n] marker in an answer, resolved to the exact passage it points at. */
+export interface Citation {
+  ordinal: number
+  chunk_id: string
+  document_id: string
+  file_name: string
+  /** Unicode code point offsets into the document's content_text. */
+  char_start: number
+  char_end: number
+  page: number | null
+  section: string
+  excerpt: string
+}
+
+export interface RetrievalSummary {
+  run_id: string
+  attempts: number
+  grade: 'good' | 'weak'
+  final_query: string
+  top_score: number | null
+  reranked: boolean
+  latency_ms: number
+}
+
+export interface AskRequest {
+  question: string
+  document_ids?: string[]
+  profile?: RetrievalProfile
+}
+
+export interface AskResponse {
+  answer_id: string
+  question: string
+  answer: string
+  answerable: boolean
+  citations: Citation[]
+  confidence: Confidence
+  grounded: boolean
+  flagged: boolean
+  flag_reasons: string[]
+  retrieval: RetrievalSummary
+  /** The model that actually answered; free-tier fallbacks change it (D-032). */
+  model: string
+}
+
+export interface AnswerListItem {
+  id: string
+  question: string
+  answer: string
+  confidence: Confidence
+  groundedness_pass: boolean
+  flagged: boolean
+  flag_reasons: string[]
+  created_at: string
+}
