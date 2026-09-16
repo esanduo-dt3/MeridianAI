@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>G1 Evaluation Results Reviewer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #f4f7fb;
+      --surface: #ffffff;
+      --surface-muted: #f8fafc;
+      --ink: #172033;
+      --muted: #5d687a;
+      --line: #dce3ee;
+      --primary: #254ccf;
+      --primary-hover: #1739ad;
+      --good: #167047;
+      --warn: #9d6500;
+      --bad: #b32932;
+      --radius: 12px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button,
+    select,
+    input[type="search"] {
+      min-height: 42px;
+      border-radius: 8px;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid transparent;
+      font-weight: 700;
+      padding: 0 16px;
+    }
+
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible {
+      outline: 3px solid #9db4ff;
+      outline-offset: 2px;
+    }
+
+    .page-header {
+      background: #172554;
+      color: white;
+      padding: 30px max(20px, calc((100vw - 1440px) / 2));
+    }
+
+    .header-layout,
+    main {
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .header-layout {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 6px;
+      font-size: clamp(1.65rem, 3vw, 2.35rem);
+      line-height: 1.15;
+    }
+
+    .header-description {
+      margin: 0;
+      max-width: 760px;
+      color: #d9e3ff;
+    }
+
+    .file-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .button-primary {
+      background: #ffffff;
+      color: #1739ad;
+    }
+
+    .button-primary:hover {
+      background: #e7edff;
+    }
+
+    .button-secondary {
+      border-color: #95a7db;
+      background: transparent;
+      color: white;
+    }
+
+    .button-secondary:hover {
+      background: #253a78;
+    }
+
+    main {
+      padding: 24px 20px 48px;
+    }
+
+    .status-message {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border: 1px solid #bed0ff;
+      border-radius: 8px;
+      background: #edf3ff;
+      color: #183b9f;
+    }
+
+    .status-message[data-level="error"] {
+      border-color: #f0bec2;
+      background: #fff1f2;
+      color: #9f1c25;
+    }
+
+    .status-message[data-level="success"] {
+      border-color: #b6dfc9;
+      background: #effaf3;
+      color: #12663c;
+    }
+
+    .run-summary,
+    .controls,
+    .empty-state,
+    .question-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 1px 2px rgb(23 32 51 / 4%);
+    }
+
+    .run-summary {
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .summary-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .summary-title-row h2 {
+      margin-bottom: 0;
+      font-size: 1.1rem;
+    }
+
+    .source-file {
+      color: var(--muted);
+      font-size: 0.875rem;
+      overflow-wrap: anywhere;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: var(--surface-muted);
+    }
+
+    .metric-value {
+      display: block;
+      font-size: 1.35rem;
+      font-weight: 800;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .run-details {
+      margin: 18px 0 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 8px 20px;
+    }
+
+    .run-details div {
+      display: grid;
+      gap: 2px;
+    }
+
+    dt {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .controls label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    input[type="search"],
+    select {
+      width: 100%;
+      border: 1px solid #bfcadd;
+      background: white;
+      color: var(--ink);
+      padding: 0 10px;
+    }
+
+    .search-control {
+      flex: 1 1 300px;
+    }
+
+    .filter-control {
+      flex: 0 1 190px;
+    }
+
+    .question-list {
+      display: grid;
+      gap: 18px;
+    }
+
+    .question-card {
+      overflow: hidden;
+    }
+
+    .question-card[data-review-status="complete"] {
+      border-left: 5px solid var(--good);
+    }
+
+    .question-card[data-review-status="incomplete"] {
+      border-left: 5px solid var(--warn);
+    }
+
+    .question-card-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcff;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .question-id {
+      margin: 0 0 6px;
+      color: var(--primary);
+      font-size: 0.86rem;
+      font-weight: 800;
+      letter-spacing: 0.07em;
+    }
+
+    .question-card h2 {
+      margin-bottom: 0;
+      font-size: 1.13rem;
+      line-height: 1.35;
+    }
+
+    .badges {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      border-radius: 999px;
+      background: #e7ecf5;
+      color: #354158;
+      font-size: 0.76rem;
+      font-weight: 750;
+      padding: 3px 9px;
+      white-space: nowrap;
+    }
+
+    .badge-good {
+      background: #dff5e8;
+      color: #0f6038;
+    }
+
+    .badge-warn {
+      background: #fff0d1;
+      color: #8a5700;
+    }
+
+    .badge-bad {
+      background: #ffe3e5;
+      color: #9f2029;
+    }
+
+    .question-body {
+      padding: 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .comparison-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .panel {
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-muted);
+    }
+
+    .panel h3 {
+      margin-bottom: 12px;
+      font-size: 0.95rem;
+    }
+
+    .field-list {
+      display: grid;
+      gap: 13px;
+      margin: 0;
+    }
+
+    .field-list div {
+      display: grid;
+      gap: 3px;
+    }
+
+    .field-list dd {
+      white-space: pre-wrap;
+    }
+
+    .quote,
+    .answer {
+      margin: 0;
+      white-space: pre-wrap;
+    }
+
+    .quote {
+      padding-left: 12px;
+      border-left: 3px solid #a7b5d5;
+      color: #3f4d65;
+      font-style: italic;
+    }
+
+    .answer {
+      color: #19233a;
+      font-weight: 550;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .detail-grid div {
+      padding: 9px;
+      border: 1px solid #dfe5ee;
+      border-radius: 7px;
+      background: white;
+      overflow-wrap: anywhere;
+    }
+
+    .detail-grid strong {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--muted);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.035em;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: white;
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 750;
+    }
+
+    .details-content {
+      padding: 0 14px 14px;
+    }
+
+    .citation-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .citation {
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-muted);
+    }
+
+    .citation h4 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+    }
+
+    .citation-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .review-panel {
+      padding: 18px;
+      border: 2px solid #aebfff;
+      border-radius: 10px;
+      background: #f5f7ff;
+    }
+
+    .review-panel h3 {
+      margin-bottom: 5px;
+    }
+
+    .review-help {
+      margin-bottom: 14px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .review-controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .review-controls label,
+    .review-notes-label {
+      display: grid;
+      gap: 5px;
+      color: #34405a;
+      font-size: 0.85rem;
+      font-weight: 750;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 92px;
+      resize: vertical;
+      border: 1px solid #bfcadd;
+      border-radius: 8px;
+      background: white;
+      color: var(--ink);
+      padding: 10px;
+    }
+
+    .review-notes-label {
+      margin-top: 12px;
+    }
+
+    .empty-state {
+      padding: 42px 20px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    @media (max-width: 840px) {
+      .header-layout,
+      .question-card-header {
+        flex-direction: column;
+      }
+
+      .file-actions,
+      .badges {
+        justify-content: flex-start;
+      }
+
+      .metric-grid,
+      .comparison-grid,
+      .review-controls {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <div class="header-layout">
+      <div>
+        <h1>G1 Evaluation Results Reviewer</h1>
+        <p class="header-description">
+          Review expected answers, generated answers, citations, automated signals, and enter the final human grading for each evaluation question.
+        </p>
+      </div>
+      <div class="file-actions">
+        <input id="json-file-input" class="visually-hidden" type="file" accept="application/json,.json">
+        <button id="open-file-button" class="button-secondary" type="button">Open JSON file</button>
+        <button id="save-file-button" class="button-primary" type="button" disabled>Save reviewed JSON</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <p id="status-message" class="status-message" role="status" aria-live="polite">
+      Loading <strong>G1-final.json</strong> from this folder. If you opened this page directly from your computer, choose “Open JSON file” instead.
+    </p>
+
+    <section id="summary-section" class="run-summary" hidden aria-labelledby="summary-heading">
+      <div class="summary-title-row">
+        <h2 id="summary-heading">Review progress</h2>
+        <span id="source-file" class="source-file"></span>
+      </div>
+      <div id="metric-grid" class="metric-grid"></div>
+      <dl id="run-details" class="run-details"></dl>
+    </section>
+
+    <section id="controls-section" class="controls" hidden aria-label="Question filters">
+      <label class="search-control">
+        Search questions and answers
+        <input id="search-input" type="search" placeholder="Search ID, question, expected answer, or generated answer">
+      </label>
+      <label class="filter-control">
+        Show
+        <select id="review-filter">
+          <option value="all">All questions</option>
+          <option value="unreviewed">Unreviewed only</option>
+          <option value="reviewed">Reviewed only</option>
+          <option value="flagged">Auto-flagged only</option>
+        </select>
+      </label>
+    </section>
+
+    <section id="question-list" class="question-list" aria-label="G1 evaluation questions">
+      <div class="empty-state">
+        <p><strong>No evaluation data is loaded yet.</strong></p>
+        <p>Select <code>G1-final.json</code> to start reviewing results.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const state = {
+        data: null,
+        fileHandle: null,
+        fileName: "G1-final.json"
+      };
+
+      const elements = {
+        controls: document.getElementById("controls-section"),
+        fileInput: document.getElementById("json-file-input"),
+        metricGrid: document.getElementById("metric-grid"),
+        openButton: document.getElementById("open-file-button"),
+        questionList: document.getElementById("question-list"),
+        reviewFilter: document.getElementById("review-filter"),
+        saveButton: document.getElementById("save-file-button"),
+        searchInput: document.getElementById("search-input"),
+        sourceFile: document.getElementById("source-file"),
+        status: document.getElementById("status-message"),
+        summary: document.getElementById("summary-section"),
+        runDetails: document.getElementById("run-details")
+      };
+
+      /**
+       * Returns a readable placeholder when an evaluation field is blank.
+       *
+       * @param {*} value - The evaluation value to display.
+       * @returns {string} A safe, readable representation of the value.
+       */
+      function displayValue(value) {
+        if (value === null || value === undefined || value === "") {
+          return "—";
+        }
+        if (Array.isArray(value)) {
+          return value.length ? value.join(", ") : "—";
+        }
+        if (typeof value === "boolean") {
+          return value ? "Yes" : "No";
+        }
+        if (typeof value === "object") {
+          return JSON.stringify(value);
+        }
+        return String(value);
+      }
+
+      /**
+       * Creates an element and applies optional content or attributes without
+       * injecting evaluation-data strings as HTML.
+       *
+       * @param {string} tagName - HTML element name.
+       * @param {string} [className] - Optional CSS class name.
+       * @param {string} [text] - Optional plain-text contents.
+       * @returns {HTMLElement} The created element.
+       */
+      function createElement(tagName, className, text) {
+        const element = document.createElement(tagName);
+        if (className) {
+          element.className = className;
+        }
+        if (text !== undefined) {
+          element.textContent = text;
+        }
+        return element;
+      }
+
+      /**
+       * Updates the status area with a concise loading, success, or error message.
+       *
+       * @param {string} message - Message for the reviewer.
+       * @param {"info"|"success"|"error"} [level="info"] - Visual status level.
+       * @returns {void}
+       */
+      function setStatus(message, level = "info") {
+        elements.status.textContent = message;
+        elements.status.dataset.level = level;
+      }
+
+      /**
+       * Determines whether a question has a recorded final reviewer grade.
+       *
+       * @param {object} question - A G1 evaluation question record.
+       * @returns {boolean} Whether the reviewer has selected a final grade.
+       */
+      function isReviewed(question) {
+        return Boolean(question.grading && question.grading.final_grade);
+      }
+
+      /**
+       * Ensures the grading object includes all human-review fields used by this UI.
+       * Existing grading values are always retained.
+       *
+       * @param {object} question - A G1 evaluation question record.
+       * @returns {object} The normalized grading object.
+       */
+      function ensureGrading(question) {
+        if (!question.grading || typeof question.grading !== "object") {
+          question.grading = {};
+        }
+
+        if (!Object.hasOwn(question.grading, "final_grade")) {
+          question.grading.final_grade = "";
+        }
+        if (!Object.hasOwn(question.grading, "answer_correct")) {
+          question.grading.answer_correct = null;
+        }
+        if (!Object.hasOwn(question.grading, "citation_acceptable")) {
+          question.grading.citation_acceptable = null;
+        }
+        if (!Object.hasOwn(question.grading, "notes")) {
+          question.grading.notes = "";
+        }
+
+        return question.grading;
+      }
+
+      /**
+       * Loads parsed JSON data after checking it follows the G1 results shape.
+       *
+       * @param {object} data - Parsed JSON result data.
+       * @param {string} fileName - Name of the source file.
+       * @param {FileSystemFileHandle|null} [fileHandle=null] - Optional writable browser file handle.
+       * @returns {void}
+       */
+      function loadData(data, fileName, fileHandle = null) {
+        if (!data || !Array.isArray(data.questions)) {
+          throw new Error("The selected file does not contain a top-level “questions” array.");
+        }
+
+        data.questions.forEach(ensureGrading);
+        state.data = data;
+        state.fileName = fileName || "G1-final.json";
+        state.fileHandle = fileHandle;
+        elements.saveButton.disabled = false;
+
+        renderSummary();
+        renderQuestions();
+        elements.summary.hidden = false;
+        elements.controls.hidden = false;
+        setStatus(`Loaded ${data.questions.length} evaluation questions from ${state.fileName}.`, "success");
+      }
+
+      /**
+       * Renders run metadata and current reviewer completion counts.
+       *
+       * @returns {void}
+       */
+      function renderSummary() {
+        const questions = state.data.questions;
+        const reviewed = questions.filter(isReviewed).length;
+        const flagged = questions.filter((question) => question.result && question.result.flagged).length;
+        const correct = questions.filter(
+          (question) => question.grading && question.grading.answer_correct === true
+        ).length;
+
+        elements.sourceFile.textContent = `Source: ${state.fileName}`;
+        elements.metricGrid.replaceChildren(
+          metric("Questions", `${questions.length}`),
+          metric("Final grades entered", `${reviewed} / ${questions.length}`),
+          metric("Answers marked correct", `${correct}`),
+          metric("Auto-flagged", `${flagged}`)
+        );
+
+        const run = state.data.run || {};
+        elements.runDetails.replaceChildren(
+          detail("Mode", run.mode),
+          detail("Started", run.started_at),
+          detail("Workspace", run.workspace_name),
+          detail("Answer model", run.configured_answer_model),
+          detail("Corpus documents", run.corpus && run.corpus.documents),
+          detail("Corpus passages", run.corpus && run.corpus.passages),
+          detail("Run note", run.note)
+        );
+      }
+
+      /**
+       * Creates a summary metric panel.
+       *
+       * @param {string} label - Metric description.
+       * @param {string} value - Metric value.
+       * @returns {HTMLElement} Metric panel.
+       */
+      function metric(label, value) {
+        const panel = createElement("div", "metric");
+        panel.append(createElement("span", "metric-value", value));
+        panel.append(createElement("span", "metric-label", label));
+        return panel;
+      }
+
+      /**
+       * Creates a metadata definition-list entry.
+       *
+       * @param {string} label - Metadata label.
+       * @param {*} value - Metadata value.
+       * @returns {HTMLElement} Definition-list entry.
+       */
+      function detail(label, value) {
+        const wrapper = document.createElement("div");
+        wrapper.append(createElement("dt", "", label));
+        wrapper.append(createElement("dd", "", displayValue(value)));
+        return wrapper;
+      }
+
+      /**
+       * Gets questions matching the visible review and text filters.
+       *
+       * @returns {object[]} The questions to display.
+       */
+      function filteredQuestions() {
+        if (!state.data) {
+          return [];
+        }
+
+        const searchTerm = elements.searchInput.value.trim().toLowerCase();
+        const filter = elements.reviewFilter.value;
+
+        return state.data.questions.filter((question) => {
+          const grading = ensureGrading(question);
+          const result = question.result || {};
+          const matchesReviewFilter =
+            filter === "all" ||
+            (filter === "reviewed" && Boolean(grading.final_grade)) ||
+            (filter === "unreviewed" && !grading.final_grade) ||
+            (filter === "flagged" && Boolean(result.flagged));
+
+          const searchableText = [
+            question.id,
+            question.question,
+            question.expected && question.expected.expected_answer,
+            question.expected && question.expected.quote,
+            result.answer,
+            question.notes,
+            grading.notes
+          ].map(displayValue).join(" ").toLowerCase();
+
+          return matchesReviewFilter && (!searchTerm || searchableText.includes(searchTerm));
+        });
+      }
+
+      /**
+       * Renders the evaluation cards matching the active filters.
+       *
+       * @returns {void}
+       */
+      function renderQuestions() {
+        const questions = filteredQuestions();
+        elements.questionList.replaceChildren();
+
+        if (!questions.length) {
+          const empty = createElement("div", "empty-state");
+          empty.append(createElement("p", "", "No questions match the current filters."));
+          elements.questionList.append(empty);
+          return;
+        }
+
+        questions.forEach((question) => elements.questionList.append(buildQuestionCard(question)));
+      }
+
+      /**
+       * Builds a card containing complete expected, generated, automated, and human-review data.
+       *
+       * @param {object} question - A G1 evaluation question record.
+       * @returns {HTMLElement} Question review card.
+       */
+      function buildQuestionCard(question) {
+        const result = question.result || {};
+        const expected = question.expected || {};
+        const grading = ensureGrading(question);
+        const card = createElement("article", "question-card");
+        card.dataset.reviewStatus = grading.final_grade ? "complete" : "incomplete";
+
+        const header = createElement("header", "question-card-header");
+        const heading = document.createElement("div");
+        heading.append(createElement("p", "question-id", displayValue(question.id)));
+        heading.append(createElement("h2", "", displayValue(question.question)));
+
+        const badges = createElement("div", "badges");
+        badges.append(badge(question.kind || "evaluation", ""));
+        badges.append(badge(question.answerable_expected ? "Expected answerable" : "Expected refusal", "badge-warn"));
+        badges.append(badge(grading.final_grade ? `Final: ${grading.final_grade}` : "Not reviewed", grading.final_grade ? "badge-good" : "badge-warn"));
+        if (result.flagged) {
+          badges.append(badge("Auto-flagged", "badge-bad"));
+        }
+
+        header.append(heading, badges);
+        card.append(header);
+
+        const body = createElement("div", "question-body");
+        const comparison = createElement("div", "comparison-grid");
+        comparison.append(buildExpectedPanel(question, expected));
+        comparison.append(buildActualPanel(question, result));
+        body.append(comparison);
+        body.append(buildAutoScoreDetails(question.auto_score || {}, result));
+        body.append(buildCitationDetails(result.citations || []));
+        body.append(buildReviewPanel(question, card));
+        card.append(body);
+
+        return card;
+      }
+
+      /**
+       * Creates a labeled visual badge.
+       *
+       * @param {string} text - Badge contents.
+       * @param {string} className - Additional badge style class.
+       * @returns {HTMLElement} Badge.
+       */
+      function badge(text, className) {
+        return createElement("span", `badge ${className}`.trim(), text);
+      }
+
+      /**
+       * Builds expected-answer and source-context information.
+       *
+       * @param {object} question - Evaluation question.
+       * @param {object} expected - Expected answer object.
+       * @returns {HTMLElement} Expected-answer panel.
+       */
+      function buildExpectedPanel(question, expected) {
+        const panel = createElement("section", "panel");
+        panel.append(createElement("h3", "", "Expected result"));
+
+        const fields = createElement("dl", "field-list");
+        fields.append(detail("Expected answer", expected.expected_answer));
+        fields.append(detail("Expected source document", expected.document));
+
+        const quoteEntry = document.createElement("div");
+        quoteEntry.append(createElement("dt", "", "Expected evidence quote"));
+        quoteEntry.append(createElement("dd", "quote", displayValue(expected.quote)));
+        fields.append(quoteEntry);
+
+        fields.append(detail("Expected chunk IDs", expected.chunk_ids));
+        fields.append(detail("Expected chunk indexes", expected.chunk_indexes));
+        fields.append(detail("Evaluation notes", question.notes));
+        panel.append(fields);
+        return panel;
+      }
+
+      /**
+       * Builds model-answer and execution details.
+       *
+       * @param {object} question - Evaluation question.
+       * @param {object} result - Generated result object.
+       * @returns {HTMLElement} Generated-answer panel.
+       */
+      function buildActualPanel(question, result) {
+        const panel = createElement("section", "panel");
+        panel.append(createElement("h3", "", "Actual generated result"));
+
+        const answerLabel = createElement("p", "", "Generated answer");
+        answerLabel.style.fontWeight = "750";
+        answerLabel.style.marginBottom = "5px";
+        panel.append(answerLabel);
+        panel.append(createElement("p", "answer", displayValue(result.answer)));
+
+        const details = createElement("div", "detail-grid");
+        details.append(compactDetail("Answerable", result.answerable));
+        details.append(compactDetail("Grounded", result.grounded));
+        details.append(compactDetail("Confidence", result.confidence));
+        details.append(compactDetail("Confidence label", result.confidence_label));
+        details.append(compactDetail("Model", result.model));
+        details.append(compactDetail("Attempts", result.attempts));
+        details.append(compactDetail("Latency", result.latency_ms === null || result.latency_ms === undefined ? null : `${result.latency_ms} ms`));
+        details.append(compactDetail("Reranked", result.reranked));
+        details.append(compactDetail("Auto grade", result.grade));
+        details.append(compactDetail("Auto grade note", result.grade_note));
+        details.append(compactDetail("Profile", question.profile));
+        details.append(compactDetail("Final query", result.final_query));
+        panel.append(details);
+
+        if ((result.flag_reasons && result.flag_reasons.length) || (result.unsupported && result.unsupported.length)) {
+          const warning = createElement("div", "detail-grid");
+          warning.style.marginTop = "10px";
+          warning.append(compactDetail("Flag reasons", result.flag_reasons));
+          warning.append(compactDetail("Unsupported claims", result.unsupported));
+          panel.append(warning);
+        }
+
+        return panel;
+      }
+
+      /**
+       * Builds an individual compact field.
+       *
+       * @param {string} label - Field name.
+       * @param {*} value - Field value.
+       * @returns {HTMLElement} Compact field element.
+       */
+      function compactDetail(label, value) {
+        const field = document.createElement("div");
+        field.append(createElement("strong", "", label));
+        field.append(document.createTextNode(displayValue(value)));
+        return field;
+      }
+
+      /**
+       * Builds expandable automated retrieval/scoring details.
+       *
+       * @param {object} autoScore - Automated score object.
+       * @param {object} result - Generated result object.
+       * @returns {HTMLElement} Details element.
+       */
+      function buildAutoScoreDetails(autoScore, result) {
+        const details = document.createElement("details");
+        const summary = createElement("summary", "", "Automated retrieval and quality signals");
+        const content = createElement("div", "details-content");
+        const grid = createElement("div", "detail-grid");
+
+        grid.append(compactDetail("Expected chunk retrieved", autoScore.expected_chunk_retrieved));
+        grid.append(compactDetail("Rank of expected chunk", autoScore.rank_of_expected));
+        grid.append(compactDetail("Reciprocal rank", autoScore.reciprocal_rank));
+        grid.append(compactDetail("Retrieved count", autoScore.retrieved_count));
+        grid.append(compactDetail("Expected chunk cited", autoScore.expected_chunk_cited));
+        grid.append(compactDetail("Expected citation position", autoScore.cited_position_of_expected));
+        grid.append(compactDetail("Fallback model used", autoScore.answered_by_fallback_model));
+        grid.append(compactDetail("Model refused", autoScore.refused));
+        grid.append(compactDetail("Refusal correct", autoScore.refusal_correct));
+        grid.append(compactDetail("Run ID", result.run_id));
+        grid.append(compactDetail("Answer ID", result.answer_id));
+
+        content.append(grid);
+        details.append(summary, content);
+        return details;
+      }
+
+      /**
+       * Builds expandable supporting-citation evidence.
+       *
+       * @param {object[]} citations - Generated answer citations.
+       * @returns {HTMLElement} Details element.
+       */
+      function buildCitationDetails(citations) {
+        const details = document.createElement("details");
+        const summary = createElement(
+          "summary",
+          "",
+          citations.length ? `Supporting citations (${citations.length})` : "Supporting citations (none)"
+        );
+        const content = createElement("div", "details-content");
+
+        if (!citations.length) {
+          content.append(createElement("p", "", "The generated answer did not include any citations."));
+        } else {
+          const list = createElement("div", "citation-list");
+          citations.forEach((citation, index) => {
+            const item = createElement("article", "citation");
+            item.append(createElement("h4", "", `Citation ${displayValue(citation.ordinal || index + 1)} · ${displayValue(citation.file_name)}`));
+
+            const meta = createElement("div", "citation-meta");
+            meta.append(createElement("span", "", `Section: ${displayValue(citation.section)}`));
+            meta.append(createElement("span", "", `Page: ${displayValue(citation.page)}`));
+            meta.append(createElement("span", "", `Rerank score: ${displayValue(citation.rerank_score)}`));
+            meta.append(createElement("span", "", `Chunk ID: ${displayValue(citation.chunk_id)}`));
+
+            item.append(meta);
+            item.append(createElement("p", "quote", displayValue(citation.excerpt)));
+            list.append(item);
+          });
+          content.append(list);
+        }
+
+        details.append(summary, content);
+        return details;
+      }
+
+      /**
+       * Builds controls for the final reviewer decision saved to question.grading.
+       *
+       * @param {object} question - Evaluation question.
+       * @param {HTMLElement} card - Parent question card for visual status updates.
+       * @returns {HTMLElement} Review panel.
+       */
+      function buildReviewPanel(question, card) {
+        const grading = ensureGrading(question);
+        const panel = createElement("section", "review-panel");
+        panel.append(createElement("h3", "", "Final reviewer grading"));
+        panel.append(createElement("p", "review-help", "Your selections are stored in this question’s “grading” object when you save the JSON."));
+
+        const controls = createElement("div", "review-controls");
+        const finalGrade = selectControl(
+          "Final grade",
+          [
+            ["", "Not reviewed"],
+            ["pass", "Pass"],
+            ["partial", "Partial / needs follow-up"],
+            ["fail", "Fail"]
+          ],
+          grading.final_grade
+        );
+        const answerCorrect = selectControl(
+          "Answer correct?",
+          [
+            ["", "Not assessed"],
+            ["true", "Yes"],
+            ["partial", "Partially"],
+            ["false", "No"]
+          ],
+          grading.answer_correct === null || grading.answer_correct === undefined ? "" : String(grading.answer_correct)
+        );
+        const citationAcceptable = selectControl(
+          "Citation acceptable?",
+          [
+            ["", "Not assessed"],
+            ["true", "Yes"],
+            ["false", "No"],
+            ["not_applicable", "Not applicable"]
+          ],
+          grading.citation_acceptable === null || grading.citation_acceptable === undefined
+            ? ""
+            : String(grading.citation_acceptable)
+        );
+
+        finalGrade.select.addEventListener("change", () => {
+          grading.final_grade = finalGrade.select.value;
+          card.dataset.reviewStatus = grading.final_grade ? "complete" : "incomplete";
+          renderSummary();
+          renderQuestions();
+        });
+
+        answerCorrect.select.addEventListener("change", () => {
+          grading.answer_correct = parseReviewBoolean(answerCorrect.select.value);
+          renderSummary();
+        });
+
+        citationAcceptable.select.addEventListener("change", () => {
+          grading.citation_acceptable = parseReviewBoolean(citationAcceptable.select.value);
+          renderSummary();
+        });
+
+        controls.append(finalGrade.label, answerCorrect.label, citationAcceptable.label);
+        panel.append(controls);
+
+        const notesLabel = createElement("label", "review-notes-label", "Reviewer notes");
+        const notes = document.createElement("textarea");
+        notes.value = grading.notes || "";
+        notes.placeholder = "Add the reasoning behind the final grade, corrections, or follow-up work.";
+        notes.addEventListener("input", () => {
+          grading.notes = notes.value;
+        });
+        notesLabel.append(notes);
+        panel.append(notesLabel);
+
+        return panel;
+      }
+
+      /**
+       * Builds a labeled select element.
+       *
+       * @param {string} labelText - Accessible field label.
+       * @param {Array<[string, string]>} options - Value and label pairs.
+       * @param {string} selectedValue - Initially selected value.
+       * @returns {{label: HTMLLabelElement, select: HTMLSelectElement}} Select control.
+       */
+      function selectControl(labelText, options, selectedValue) {
+        const label = createElement("label", "", labelText);
+        const select = document.createElement("select");
+
+        const optionValues = new Set(options.map(([value]) => value));
+        if (selectedValue && !optionValues.has(selectedValue)) {
+          options = [[selectedValue, selectedValue], ...options];
+        }
+
+        options.forEach(([value, text]) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = text;
+          option.selected = value === selectedValue;
+          select.append(option);
+        });
+
+        label.append(select);
+        return { label, select };
+      }
+
+      /**
+       * Converts a reviewer select value into the JSON grading representation.
+       *
+       * @param {string} value - Selected value.
+       * @returns {boolean|string|null} A stored grading value.
+       */
+      function parseReviewBoolean(value) {
+        if (value === "") {
+          return null;
+        }
+        if (value === "true") {
+          return true;
+        }
+        if (value === "false") {
+          return false;
+        }
+        return value;
+      }
+
+      /**
+       * Opens a JSON file using the File System Access API when available,
+       * retaining its handle so supported browsers can write it back in place.
+       *
+       * @returns {Promise<void>} Completion of the file-selection workflow.
+       */
+      async function openJsonFile() {
+        if ("showOpenFilePicker" in window) {
+          try {
+            const [handle] = await window.showOpenFilePicker({
+              multiple: false,
+              types: [{
+                description: "JSON evaluation results",
+                accept: { "application/json": [".json"] }
+              }]
+            });
+            const file = await handle.getFile();
+            const data = JSON.parse(await file.text());
+            loadData(data, file.name, handle);
+            return;
+          } catch (error) {
+            if (error.name !== "AbortError") {
+              setStatus(`Could not open the file: ${error.message}`, "error");
+            }
+            return;
+          }
+        }
+
+        elements.fileInput.click();
+      }
+
+      /**
+       * Handles JSON selected through the cross-browser file input fallback.
+       *
+       * @param {Event} event - Input change event.
+       * @returns {Promise<void>} Completion of file parsing.
+       */
+      async function handleFileInput(event) {
+        const [file] = event.target.files;
+        if (!file) {
+          return;
+        }
+
+        try {
+          const data = JSON.parse(await file.text());
+          loadData(data, file.name);
+        } catch (error) {
+          setStatus(`Could not read the selected JSON file: ${error.message}`, "error");
+        } finally {
+          event.target.value = "";
+        }
+      }
+
+      /**
+       * Saves the complete updated JSON. Browsers with File System Access support
+       * overwrite the opened file; other browsers download a reviewed JSON copy.
+       *
+       * @returns {Promise<void>} Completion of the save workflow.
+       */
+      async function saveReviewedJson() {
+        if (!state.data) {
+          return;
+        }
+
+        const json = `${JSON.stringify(state.data, null, 2)}\n`;
+
+        try {
+          if (state.fileHandle) {
+            const writable = await state.fileHandle.createWritable();
+            await writable.write(json);
+            await writable.close();
+            setStatus(`Saved reviewer grades back to ${state.fileName}.`, "success");
+            return;
+          }
+
+          const reviewFileName = state.fileName.replace(/\.json$/i, "") + "-reviewed.json";
+          const blob = new Blob([json], { type: "application/json" });
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = downloadUrl;
+          link.download = reviewFileName;
+          document.body.append(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(downloadUrl);
+          setStatus(
+            `Downloaded ${reviewFileName}. Replace G1-final.json with this file when you are ready to keep the grades.`,
+            "success"
+          );
+        } catch (error) {
+          setStatus(`Could not save the reviewed JSON: ${error.message}`, "error");
+        }
+      }
+
+      /**
+       * Attempts to load the colocated G1-final dataset when this page is served
+       * over HTTP. Direct file:// access normally requires the Open JSON control.
+       *
+       * @returns {Promise<void>} Completion of automatic loading attempt.
+       */
+      async function autoLoadDefaultData() {
+        try {
+          const response = await fetch("G1-final.json", { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          loadData(await response.json(), "G1-final.json");
+        } catch {
+          setStatus(
+            "Choose “Open JSON file” and select G1-final.json. This is required when the reviewer is opened directly from your computer.",
+            "info"
+          );
+        }
+      }
+
+      elements.openButton.addEventListener("click", openJsonFile);
+      elements.fileInput.addEventListener("change", handleFileInput);
+      elements.saveButton.addEventListener("click", saveReviewedJson);
+      elements.searchInput.addEventListener("input", renderQuestions);
+      elements.reviewFilter.addEventListener("change", renderQuestions);
+
+      autoLoadDefaultData();
+    })();
+  </script>
+</body>
+</html>

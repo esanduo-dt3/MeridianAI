@@ -278,3 +278,90 @@ export interface ChatResponse {
   injection_detected: boolean
   models: string[]
 }
+
+/* Admin surfaces (backend/app/api/admin.py). */
+
+export interface ReviewAnswer {
+  id: string
+  question: string
+  answer: string
+  confidence: Confidence
+  groundedness_pass: boolean
+  flag_reasons: string[]
+  model: string | null
+  asked_by: string | null
+  created_at: string
+  citations: Citation[]
+}
+
+export interface ReviewAction {
+  id: string
+  action_type: string
+  reasoning: string
+  proposed_payload: Proposal['proposed_payload']
+  created_at: string
+}
+
+export interface RecentDecision {
+  kind: 'answer' | 'action'
+  target_id: string
+  decision: 'confirmed' | 'corrected' | 'dismissed' | 'approved' | 'rejected'
+  notes: string | null
+  correction: string | null
+  at: string
+  summary: string
+  by: string | null
+}
+
+export interface ReviewQueue {
+  answers: ReviewAnswer[]
+  actions: ReviewAction[]
+  recent: RecentDecision[]
+}
+
+export type ReviewDecisionKind = 'confirmed' | 'corrected' | 'dismissed'
+
+export interface AuditEntry {
+  id: string
+  actor_type: 'user' | 'agent' | 'system'
+  action: string
+  target_type: string | null
+  target_id: string | null
+  timestamp: string
+  details: Record<string, unknown>
+  actor: { email: string; full_name: string | null } | null
+}
+
+export interface AuditPage {
+  entries: AuditEntry[]
+  next_before: string | null
+}
+
+export interface HealthRate {
+  hits: number
+  n: number
+  rate: number | null
+}
+
+export interface PipelineHealth {
+  window: { days: number; from: string; to: string }
+  questions: number
+  answers: number
+  retrieval_graded_good: HealthRate
+  groundedness_passed: HealthRate
+  flagged: HealthRate
+  retried: HealthRate
+  rerank_unavailable: HealthRate
+  latency_ms: { p50: number | null; p95: number | null; max: number | null; n: number; target_p50: number }
+  flag_reasons: Record<string, number>
+  models: Record<string, number>
+  profiles: Record<string, number>
+  by_day: Array<{
+    date: string
+    questions: number
+    graded_good: HealthRate
+    groundedness_passed: HealthRate
+    flagged: HealthRate
+    latency_p50_ms: number | null
+  }>
+}
