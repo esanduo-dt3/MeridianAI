@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "run": {
+    "mode": "full",
+    "started_at": "2026-09-16T08:58:49.647628+00:00",
+    "workspace_id": "0b21c758-c6b1-4cd3-adf6-4e7e5c106b1a",
+    "workspace_name": "Newbie Lab",
+    "golden_file": "/Users/esanduobadaarachchi/Downloads/DT3/MeridianAI/backend/evals/golden.jsonl",
+    "corpus": {
+      "documents": 6,
+      "passages": 163,
+      "file_names": [
+        "DT3_Code_of_Conduct.docx",
+        "DT3_Offer Letter_Esandu copy.docx",
+        "northline-coldchain-fieldguide.docx",
+        "northline-coldchain-platform.docx",
+        "riverside-scada-architecture.docx",
+        "riverside-scada-runbook.docx"
+      ]
+    },
+    "configured_answer_model": "gemini-3.5-flash",
+    "configured_fast_model": "gemini-3.5-flash-lite",
+    "pace_seconds": 25.0,
+    "questions_without_rerank": 1
+  },
+  "questions": [
+    {
+      "id": "U-01",
+      "question": "What should Esandu do in the new job?",
+      "profile": "explore",
+      "kind": "multi_hop",
+      "answerable_expected": true,
+      "expected": {
+        "document": "DT3_Offer Letter_Esandu copy.docx",
+        "quote": "Consultant shall perform services in the role of Associate Software Engineer for DT3/Client, at the direction of DT3/Client, pursuant to the contract between DT3 and Client",
+        "expected_answer": "The agreement names the role - Associate Software Engineer, working at the direction of DT3/Client under the DT3-Client contract - but it does NOT list the duties. It defers them to a separate Job Description provided to the consultant, which is not in this workspace. A correct answer states the role and admits the duties are not in the documents.",
+        "chunk_ids": [
+          "4953d9c5-5cd4-4f60-95ea-ca5ee51e6e74"
+        ],
+        "chunk_indexes": [
+          1
+        ]
+      },
+      "notes": "Owner-authored. Honesty trap: the corpus names the role but the actual duties live in a Job Description that was never ingested. Inventing duties is the failure mode.",
+      "result": {
+        "answer": "In the new role as a Software Developer, Esandu is responsible for building and maintaining frontend features using React.js and TypeScript under the guidance of senior engineers [1]. Esandu must contribute to backend development using Python (Fast API) and/or Node.js, and write clean, well-tested code following team standards [1]. The role requires participating in code reviews, working within an Agile delivery model using Jira, and collaborating with cross-functional teams [1]. Additionally, Esandu should use GenAI tools like GitHub Copilot, Claude, and ChatGPT to accelerate coding, testing, and documentation [1]. Esandu is also expected to learn effective prompting, experiment with AI tools to improve productivity, and participate in team discussions regarding AI tool adoption [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "1b387fc0-4a02-430a-ac17-77fa6fc8e42d",
+            "file_name": "DT3_Offer Letter_Esandu copy.docx",
+            "section": "",
+            "page": null,
+            "char_start": 9253,
+            "char_end": 10724,
+            "rerank_score": 0.6484375,
+            "excerpt": "The Company will reimburse the Consultant, in accordance with Company policy, for all reasonable expenses incurred by the Consultant in performing the Services pursuant to this Agreement, if the Consultant receives written consent from an authorized agent of the Company prior to incurring such expenses and submits receipts for such expenses to the Company in accordance with Company policy.\n\nScheduled B –\n\nRoles & Responsibilities:  Software Developer\n\nKey Responsibilities\n\nFull Stack Development\n\nBuild and maintain frontend features using React.js and TypeScript under guidance from senior engi"
+          }
+        ],
+        "confidence": 0.648,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.65",
+        "final_query": "What should Esandu do in the new job?",
+        "reranked": true,
+        "latency_ms": 18436,
+        "run_id": "b8a5c817-d665-432a-a98f-1f00ca45b7b0",
+        "answer_id": "d9fe6bf4-ba7f-4aaa-aca4-3d5fc667f266"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": false,
+        "rank_of_expected": null,
+        "reciprocal_rank": 0.0,
+        "retrieved_count": 6,
+        "expected_chunk_cited": false,
+        "cited_position_of_expected": null,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "U-02",
+      "question": "When does DT3 pay, what are the dates, and what else should I know about how payment works?",
+      "profile": "summarize",
+      "kind": "multi_hop",
+      "answerable_expected": true,
+      "expected": {
+        "document": "DT3_Offer Letter_Esandu copy.docx",
+        "quote": "Day 1 to Day 30 of a calendar month will be paid on the 7th day of the following month",
+        "expected_answer": "Paid monthly in arrears: work from day 1 to day 30 of a calendar month is paid on the 7th day of the following month. Pay is calculated from hours approved by DT3/Client, submitted weekly by timecard. DT3 does NOT withhold taxes - the consultant is responsible for all taxes. Schedule A sets [REDACTED] LKR per month from 14 September 2026.",
+        "chunk_ids": [
+          "90a8bb6e-8337-4046-9ef4-cc136f6322a1"
+        ],
+        "chunk_indexes": [
+          0
+        ]
+      },
+      "notes": "Owner-authored. Multi-part: schedule, timecard basis, tax treatment, and Schedule A amount. Runs on the summarize profile, which nothing else in the set exercises.",
+      "result": {
+        "answer": "DT3 payments are made on a monthly basis [1]. Specifically, work performed from Day 1 to Day 30 of a calendar month is paid on the 7th day of the following month [1]. The pay is calculated based on the number of hours approved by DT3 or the Client, which the consultant must submit weekly through a timecard [1]. Additionally, DT3 does not withhold taxes, meaning the consultant is solely responsible for all taxes in accordance with country, federal, and state laws [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "90a8bb6e-8337-4046-9ef4-cc136f6322a1",
+            "file_name": "DT3_Offer Letter_Esandu copy.docx",
+            "section": "",
+            "page": null,
+            "char_start": 0,
+            "char_end": 1850,
+            "rerank_score": null,
+            "excerpt": "This agreement is made on 4-Sept-2026 between DigitalT3 LLC. (“DT3”) with offices located 2347 Country Club Dr, Avon, OH 44011 and  Don Esandu Meth Obadaarachchi(“Consultant”), residing at [REDACTED ADDRESS]\n\nTerm: This agreement will become effective on or about 14th Sept 2026 and the probation period is for 3 months from date of joining.\n\nCommencement: Commencement of the contract (and the start date) are contingent up on completion of a satisfactory background check verification performed as per Client/or Company policy.\n\nCompensation: "
+          }
+        ],
+        "confidence": null,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "graded good (no rerank score)",
+        "final_query": "When does DT3 pay, what are the dates, and what else should I know about how payment works?",
+        "reranked": false,
+        "latency_ms": 15813,
+        "run_id": "ec1ded5a-3fca-42e7-8c98-b5596a8a9eff",
+        "answer_id": "79dbb806-0b27-44e6-9374-03a12bf8c955"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 9,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    }
+  ]
+}

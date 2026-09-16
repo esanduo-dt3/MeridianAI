@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "run": {
+    "mode": "full",
+    "started_at": "2026-09-16T09:00:58.380899+00:00",
+    "workspace_id": "0b21c758-c6b1-4cd3-adf6-4e7e5c106b1a",
+    "workspace_name": "Newbie Lab",
+    "golden_file": "/Users/esanduobadaarachchi/Downloads/DT3/MeridianAI/backend/evals/golden.jsonl",
+    "corpus": {
+      "documents": 6,
+      "passages": 163,
+      "file_names": [
+        "DT3_Code_of_Conduct.docx",
+        "DT3_Offer Letter_Esandu copy.docx",
+        "northline-coldchain-fieldguide.docx",
+        "northline-coldchain-platform.docx",
+        "riverside-scada-architecture.docx",
+        "riverside-scada-runbook.docx"
+      ]
+    },
+    "configured_answer_model": "gemini-3.5-flash",
+    "configured_fast_model": "gemini-3.5-flash-lite",
+    "pace_seconds": 0.0,
+    "questions_without_rerank": 1
+  },
+  "questions": [
+    {
+      "id": "U-02",
+      "question": "When does DT3 pay, what are the dates, and what else should I know about how payment works?",
+      "profile": "summarize",
+      "kind": "multi_hop",
+      "answerable_expected": true,
+      "expected": {
+        "document": "DT3_Offer Letter_Esandu copy.docx",
+        "quote": "Day 1 to Day 30 of a calendar month will be paid on the 7th day of the following month",
+        "expected_answer": "Paid monthly in arrears: work from day 1 to day 30 of a calendar month is paid on the 7th day of the following month. Pay is calculated from hours approved by DT3/Client, submitted weekly by timecard. DT3 does NOT withhold taxes - the consultant is responsible for all taxes. Schedule A sets [REDACTED] LKR per month from 14 September 2026.",
+        "chunk_ids": [
+          "90a8bb6e-8337-4046-9ef4-cc136f6322a1"
+        ],
+        "chunk_indexes": [
+          0
+        ]
+      },
+      "notes": "Owner-authored. Multi-part: schedule, timecard basis, tax treatment, and Schedule A amount. Runs on the summarize profile, which nothing else in the set exercises.",
+      "result": {
+        "answer": "DT3 makes payments on a monthly basis [1]. Specifically, work completed from Day 1 to Day 30 of a calendar month is paid on the 7th day of the following month [1]. The payment amount is calculated based on the number of hours approved by DT3 or the Client, which the Consultant must submit weekly through a timecard [1]. Additionally, DT3 does not withhold taxes, meaning the Consultant is responsible for all taxes in accordance with Country, Federal, and State laws [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "90a8bb6e-8337-4046-9ef4-cc136f6322a1",
+            "file_name": "DT3_Offer Letter_Esandu copy.docx",
+            "section": "",
+            "page": null,
+            "char_start": 0,
+            "char_end": 1850,
+            "rerank_score": null,
+            "excerpt": "This agreement is made on 4-Sept-2026 between DigitalT3 LLC. (“DT3”) with offices located 2347 Country Club Dr, Avon, OH 44011 and  Don Esandu Meth Obadaarachchi(“Consultant”), residing at [REDACTED ADDRESS]\n\nTerm: This agreement will become effective on or about 14th Sept 2026 and the probation period is for 3 months from date of joining.\n\nCommencement: Commencement of the contract (and the start date) are contingent up on completion of a satisfactory background check verification performed as per Client/or Company policy.\n\nCompensation: "
+          }
+        ],
+        "confidence": null,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "graded good (no rerank score)",
+        "final_query": "When does DT3 pay, what are the dates, and what else should I know about how payment works?",
+        "reranked": false,
+        "latency_ms": 20218,
+        "run_id": "28615a1a-ce39-4efd-bcec-a04cec352498",
+        "answer_id": "5e2de039-3a61-4964-9e92-423be0975e82"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 9,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,1364 @@
+{
+  "schema_version": 1,
+  "run": {
+    "mode": "full",
+    "started_at": "2026-09-16T08:02:14.564362+00:00",
+    "workspace_id": "0b21c758-c6b1-4cd3-adf6-4e7e5c106b1a",
+    "workspace_name": "Newbie Lab",
+    "golden_file": "/Users/esanduobadaarachchi/Downloads/DT3/MeridianAI/backend/evals/golden.jsonl",
+    "corpus": {
+      "documents": 6,
+      "passages": 163,
+      "file_names": [
+        "DT3_Code_of_Conduct.docx",
+        "DT3_Offer Letter_Esandu copy.docx",
+        "northline-coldchain-fieldguide.docx",
+        "northline-coldchain-platform.docx",
+        "riverside-scada-architecture.docx",
+        "riverside-scada-runbook.docx"
+      ]
+    },
+    "configured_answer_model": "gemini-3.5-flash",
+    "configured_fast_model": "gemini-3.5-flash-lite",
+    "pace_seconds": 25.0,
+    "questions_without_rerank": 0
+  },
+  "questions": [
+    {
+      "id": "G-01",
+      "question": "For a Riverside pump station RTU, how long is the cold start delay after power is restored, and what makes it longer?",
+      "profile": "lookup",
+      "kind": "cross_doc",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-architecture.docx",
+        "quote": "is 90 seconds under normal conditions and up to 150 seconds if a firmware integrity check is triggered by an unclean shutdown",
+        "expected_answer": "90 seconds under normal conditions, and up to 150 seconds if an unclean shutdown triggers a firmware integrity check.",
+        "chunk_ids": [
+          "0bd590b4-2149-4523-9421-428547fe0745"
+        ],
+        "chunk_indexes": [
+          13
+        ]
+      },
+      "notes": "Collision: Northline's cold start delay is 45s/80s. Retrieval must not cross projects.",
+      "result": {
+        "answer": "For a Riverside pump station RTU, the cold start delay is 90 seconds under normal conditions [1]. This delay becomes longer, lasting up to 150 seconds, if a firmware integrity check is triggered by an unclean shutdown [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "0bd590b4-2149-4523-9421-428547fe0745",
+            "file_name": "riverside-scada-architecture.docx",
+            "section": "3. Component Inventory > 3.1 Power Systems",
+            "page": null,
+            "char_start": 5910,
+            "char_end": 6535,
+            "rerank_score": 0.93359375,
+            "excerpt": "Each pump station RTU carries a sealed lead-acid backup battery rated for 18 hours of autonomous operation during a mains power loss, sized against an average station draw of 2.1 amps at 24 volts DC.\n\nReservoir sites, which have no mains power in 6 of the 9 locations, instead run on a 340-watt solar array paired with two 100-amp-hour lithium batteries, sized for 4 consecutive overcast days.\n\nA station's cold start delay, the time from power restoration to the RTU reporting valid data upstream, is 90 seconds under normal conditions and up to 150 seconds if a firmware integrity check is triggere"
+          }
+        ],
+        "confidence": 0.934,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.93",
+        "final_query": "For a Riverside pump station RTU, how long is the cold start delay after power is restored, and what makes it longer?",
+        "reranked": true,
+        "latency_ms": 14454,
+        "run_id": "c1ebf761-058e-41dc-809b-54038d62002e",
+        "answer_id": "5c78379d-2b49-429d-aacf-1dfdc8639368"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-02",
+      "question": "How many hours of readings does a ColdTrace gateway buffer locally, and at what scan rate?",
+      "profile": "lookup",
+      "kind": "cross_doc",
+      "answerable_expected": true,
+      "expected": {
+        "document": "northline-coldchain-platform.docx",
+        "quote": "holds 96 hours of readings at the default 60-second scan rate",
+        "expected_answer": "96 hours of readings at the default 60-second scan rate.",
+        "chunk_ids": [
+          "fe069f55-1249-43b9-b6c8-7dcbfef41e5f"
+        ],
+        "chunk_indexes": [
+          16
+        ]
+      },
+      "notes": "Collision: Riverside buffers 72 hours at a 30-second scan rate.",
+      "result": {
+        "answer": "A ColdTrace gateway buffers 96 hours of readings locally at the default 60-second scan rate [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "fe069f55-1249-43b9-b6c8-7dcbfef41e5f",
+            "file_name": "northline-coldchain-platform.docx",
+            "section": "4. Communication Protocols and Network Topology > 4.3 Local Buffering and Message Handling",
+            "page": null,
+            "char_start": 6561,
+            "char_end": 6992,
+            "rerank_score": 0.9375,
+            "excerpt": "Local buffering at each gateway holds 96 hours of readings at the default 60-second scan rate, sized to survive the longest historically observed dead zone crossing, a 68-hour stretch on the trans-continental northern route.\n\nThe queue depth limit on the ingestion cluster's message broker is 25,000 messages per topic; once exceeded, the oldest messages are dropped and an internal alert, CT-9004, is raised for the platform team."
+          }
+        ],
+        "confidence": 0.938,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.94",
+        "final_query": "How many hours of readings does a ColdTrace gateway buffer locally, and at what scan rate?",
+        "reranked": true,
+        "latency_ms": 22673,
+        "run_id": "d08269d8-47df-400a-b3e1-d57d60564719",
+        "answer_id": "be9d48d7-26bf-4efe-9453-fdedf9b69c76"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-03",
+      "question": "At Riverside, after how many missed polls should a communication-failed station be escalated during business hours?",
+      "profile": "lookup",
+      "kind": "cross_doc",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-runbook.docx",
+        "quote": "after 2 missed polls during business hours, 08:00 to 18:00, and after 3 missed polls outside business hours",
+        "expected_answer": "Two missed polls during business hours (08:00 to 18:00), and three outside them. The runbook governs field action even though RWU-ENG-014 states a flat three.",
+        "chunk_ids": [
+          "1dd5bbe3-5571-4ce0-834d-f178fc4059f2"
+        ],
+        "chunk_indexes": [
+          7
+        ]
+      },
+      "notes": "Deliberate internal disagreement: the architecture says a flat 3 missed polls in 15 minutes. The runbook wins for field action.",
+      "result": {
+        "answer": "At Riverside, a communication-failed station should be escalated after 2 missed polls during business hours [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "1dd5bbe3-5571-4ce0-834d-f178fc4059f2",
+            "file_name": "riverside-scada-runbook.docx",
+            "section": "3. Alarm Response Procedures > 3.2 Escalation Timing",
+            "page": null,
+            "char_start": 4061,
+            "char_end": 4569,
+            "rerank_score": 0.9609375,
+            "excerpt": "Escalate a communication-failed station to the on-call Water Systems Engineer after 2 missed polls during business hours, 08:00 to 18:00, and after 3 missed polls outside business hours, a tighter daytime threshold than the flat 3-missed-poll rule in RWU-ENG-014 Section 6.1, adopted after the March 2025 outage review to catch daytime failures faster.\n\nA Critical alarm unacknowledged after 3 escalation attempts, spanning 9 minutes in total, automatically pages the Shift Supervisor as a secondary contact."
+          }
+        ],
+        "confidence": 0.961,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.96",
+        "final_query": "At Riverside, after how many missed polls should a communication-failed station be escalated during business hours?",
+        "reranked": true,
+        "latency_ms": 5278,
+        "run_id": "0a23f3cc-532d-46c2-b5cc-85e401b44b12",
+        "answer_id": "a675bffa-7503-4e2b-8e6d-22079223822f"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-04",
+      "question": "How often are Riverside flow sensors calibrated under the current field schedule, and how does that compare with the design interval?",
+      "profile": "lookup",
+      "kind": "cross_doc",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-runbook.docx",
+        "quote": "is performed every 150 days under the revised field guidance issued in Q2 2025, tighter than the 180-day design interval",
+        "expected_answer": "Every 150 days under the Q2 2025 field guidance, tighter than the 180-day design interval in RWU-ENG-014.",
+        "chunk_ids": [
+          "2e5ca8e5-b18c-4e12-a7b5-e2aab349d8cb"
+        ],
+        "chunk_indexes": [
+          8
+        ]
+      },
+      "notes": "Deliberate internal disagreement, plus Northline calibrates probes at 120 days.",
+      "result": {
+        "answer": "Riverside flow sensors are calibrated every 150 days under the current field schedule [1][2]. This is tighter than the 180-day design interval because field wear at Riverside's sites has consistently run ahead of the manufacturer's drift specification [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "2e5ca8e5-b18c-4e12-a7b5-e2aab349d8cb",
+            "file_name": "riverside-scada-runbook.docx",
+            "section": "4. Calibration Field Procedure",
+            "page": null,
+            "char_start": 4603,
+            "char_end": 5786,
+            "rerank_score": 0.95703125,
+            "excerpt": "Field calibration of flow sensors, magnetic and Coriolis alike, is performed every 150 days under the revised field guidance issued in Q2 2025, tighter than the 180-day design interval in RWU-ENG-014 Section 8.1, because field wear at Riverside's sites has consistently run ahead of the manufacturer's drift specification.\n\n1. Confirm the sensor's last calibration date on the HMI asset panel before dispatching a technician.\n\n2. Bring a certified reference meter and verify it is within its own current calibration window before use.\n\n3. Take three reference readings at low, medium and high flow, e"
+          },
+          {
+            "ordinal": 2,
+            "chunk_id": "47bb5ee7-bdb0-494c-8cc6-39afcd844133",
+            "file_name": "riverside-scada-runbook.docx",
+            "section": "9. Preventive Maintenance Schedule",
+            "page": null,
+            "char_start": 12220,
+            "char_end": 12813,
+            "rerank_score": 0.84765625,
+            "excerpt": "| Task | Frequency | Responsible role |\n| --- | --- | --- |\n| Flow sensor calibration | 150 days (field schedule) | On-Call Technician |\n| RTU firmware update | Quarterly, by geographic zone | Water Systems Engineer |\n| RTU backup battery replacement | 24 months, regardless of condition | On-Call Technician |\n| SCADA server patching | 2nd Tuesday monthly, 02:00-04:00 | Water Systems Engineer |\n| Recovery Procedure R-7 drill | Twice yearly (Feb, Aug) | Water Systems Engineer + Shift Supervisor |\n| Radio encryption key rotation | 12 months, all sites same window | Water Systems Engineer |"
+          }
+        ],
+        "confidence": 0.902,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.96",
+        "final_query": "How often are Riverside flow sensors calibrated under the current field schedule, and how does that compare with the design interval?",
+        "reranked": true,
+        "latency_ms": 5264,
+        "run_id": "0b34cafe-8430-4ecd-a8ec-5fe8f5531136",
+        "answer_id": "ea3352e9-a472-42de-bc80-7408efec0911"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-05",
+      "question": "How many trailers are assigned to Northline's Depot Central, and how many dispatcher workstations does it have?",
+      "profile": "lookup",
+      "kind": "table",
+      "answerable_expected": true,
+      "expected": {
+        "document": "northline-coldchain-fieldguide.docx",
+        "quote": "| Depot Central | Central corridor | 62 | 5 |",
+        "expected_answer": "62 trailers and 5 dispatcher workstations.",
+        "chunk_ids": [
+          "20ebfd6e-c03a-4e95-a3a8-73e3d7ed27fc"
+        ],
+        "chunk_indexes": [
+          19
+        ]
+      },
+      "notes": "Table lookup, Depot reference table. Other depots are near-identical rows.",
+      "result": {
+        "answer": "Northline's Depot Central has 62 assigned trailers and 5 dispatcher workstations [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "20ebfd6e-c03a-4e95-a3a8-73e3d7ed27fc",
+            "file_name": "northline-coldchain-fieldguide.docx",
+            "section": "12. Depot Reference Table",
+            "page": null,
+            "char_start": 9575,
+            "char_end": 9921,
+            "rerank_score": 0.96875,
+            "excerpt": "| Depot | Region | Trailers assigned | Dispatcher workstations |\n| --- | --- | --- | --- |\n| Depot North | Northern route | 48 | 4 |\n| Depot Central | Central corridor | 62 | 5 |\n| Depot South | Southern route | 40 | 3 |\n| Depot East | Eastern spur | 26 | 3 |\n| Depot West | Western spur | 20 | 3 |\n| Depot Hub | Cross-dock, all routes | 16 | 4 |"
+          }
+        ],
+        "confidence": 0.969,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.97",
+        "final_query": "How many trailers are assigned to Northline's Depot Central, and how many dispatcher workstations does it have?",
+        "reranked": true,
+        "latency_ms": 4130,
+        "run_id": "ded904e4-bc57-40b9-919c-beac5489eb95",
+        "answer_id": "d692818a-e07f-40ae-8335-cf23cac1ff5d"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-06",
+      "question": "What PLC model and firmware version do Riverside reservoir sites run?",
+      "profile": "lookup",
+      "kind": "table",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-architecture.docx",
+        "quote": "| Reservoir | 9 | Modicon M340 BMXP342020 | 2.90.1 | 1 level sensor, 1 turbidity probe |",
+        "expected_answer": "Modicon M340 BMXP342020 running firmware 2.90.1.",
+        "chunk_ids": [
+          "669050fe-5a02-4026-8a86-d3524a463a5f"
+        ],
+        "chunk_indexes": [
+          11
+        ]
+      },
+      "notes": "Table lookup. Distractor in the same table: pump stations run M580 BMEP584040 on firmware 3.14.2.",
+      "result": {
+        "answer": "Riverside reservoir sites run the Modicon M340 BMXP342020 PLC model [1]. These PLCs run firmware version 2.90.1 [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "669050fe-5a02-4026-8a86-d3524a463a5f",
+            "file_name": "riverside-scada-architecture.docx",
+            "section": "3. Component Inventory",
+            "page": null,
+            "char_start": 5331,
+            "char_end": 5689,
+            "rerank_score": 0.9140625,
+            "excerpt": "| Site type | Count | PLC model | Firmware | Sensors per site |\n| --- | --- | --- | --- | --- |\n| Pump station | 34 | Modicon M580 BMEP584040 | 3.14.2 | 1 to 2 flow meters |\n| Reservoir | 9 | Modicon M340 BMXP342020 | 2.90.1 | 1 level sensor, 1 turbidity probe |\n| Treatment plant | 3 | ControlLogix 5580 1756-L85E | 33.011 | 2 Coriolis meters, 4 analysers |"
+          }
+        ],
+        "confidence": 0.914,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.91",
+        "final_query": "What PLC model and firmware version do Riverside reservoir sites run?",
+        "reranked": true,
+        "latency_ms": 10145,
+        "run_id": "5092a499-c5dd-4758-a039-028dfbb2aaaf",
+        "answer_id": "b68680bf-65a7-4e7d-8655-6b89b7a99853"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-07",
+      "question": "Before trusting a ColdTrace gateway to survive an extended dead zone, what should a field engineer check first, and why?",
+      "profile": "lookup",
+      "kind": "single_passage",
+      "answerable_expected": true,
+      "expected": {
+        "document": "northline-coldchain-fieldguide.docx",
+        "quote": "Gateways running firmware older than version 1.8 buffer only 72 hours of readings rather than the current 96-hour design capacity",
+        "expected_answer": "The gateway's firmware version: anything older than 1.8 buffers only 72 hours rather than the 96-hour design capacity.",
+        "chunk_ids": [
+          "486a5b6a-c4a9-47e3-85c0-d16b5d88c30a"
+        ],
+        "chunk_indexes": [
+          9
+        ]
+      },
+      "notes": "Also collides with Riverside's 72-hour buffer figure.",
+      "result": {
+        "answer": "Before trusting a gateway to survive an extended dead zone without data loss, a field engineer should check the firmware version [1]. This is necessary because gateways running firmware older than version 1.8 buffer only 72 hours of readings rather than the current 96-hour design capacity [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "486a5b6a-c4a9-47e3-85c0-d16b5d88c30a",
+            "file_name": "northline-coldchain-fieldguide.docx",
+            "section": "4. Gateway Troubleshooting > 4.1 Cellular to Satellite Failover",
+            "page": null,
+            "char_start": 3734,
+            "char_end": 4403,
+            "rerank_score": 0.78125,
+            "excerpt": "The platform's design failover window from cellular to Iridium satellite is 90 seconds. In the field, if failover has not visibly completed within 2 minutes on the gateway's diagnostic LED, manually power-cycle the gateway rather than continuing to wait, a more conservative rule than the platform's stated 90-second target, adopted after several units were observed to hang rather than fail over cleanly.\n\nGateways running firmware older than version 1.8 buffer only 72 hours of readings rather than the current 96-hour design capacity in NL-TEL-005 Section 4.3; check the firmware version before as"
+          }
+        ],
+        "confidence": 0.781,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.78",
+        "final_query": "Before trusting a ColdTrace gateway to survive an extended dead zone, what should a field engineer check first, and why?",
+        "reranked": true,
+        "latency_ms": 14269,
+        "run_id": "da2e6e13-b428-4b85-94ab-e58404afd5c4",
+        "answer_id": "102db9a4-d799-4df1-abf7-4dae17e1de97"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-08",
+      "question": "What is the ingestion rate limit for a single ColdTrace gateway, and what happens when a gateway exceeds it?",
+      "profile": "lookup",
+      "kind": "cross_doc",
+      "answerable_expected": true,
+      "expected": {
+        "document": "northline-coldchain-platform.docx",
+        "quote": "The ingestion rate limit for any single gateway is 1,200 messages per minute; a gateway exceeding this limit is throttled and logged under event code CT-4420 rather than disconnected outright",
+        "expected_answer": "1,200 messages per minute. A gateway over the limit is throttled and logged under CT-4420, not disconnected.",
+        "chunk_ids": [
+          "da6af738-50fd-4f90-ade4-cfff03eebb4b"
+        ],
+        "chunk_indexes": [
+          26
+        ]
+      },
+      "notes": "Collision: Riverside's API rate limit is 600 requests/min, logged as ERR-4471.",
+      "result": {
+        "answer": "The ingestion rate limit for any single gateway is 1,200 messages per minute [1]. When a gateway exceeds this limit, it is throttled and logged under event code CT-4420 rather than disconnected outright [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "da6af738-50fd-4f90-ade4-cfff03eebb4b",
+            "file_name": "northline-coldchain-platform.docx",
+            "section": "7. Security and Access Control > 7.2 API and Integration Security",
+            "page": null,
+            "char_start": 10822,
+            "char_end": 11085,
+            "rerank_score": 0.9296875,
+            "excerpt": "API tokens issued to integration clients carry a lifetime of 12 hours. The ingestion rate limit for any single gateway is 1,200 messages per minute; a gateway exceeding this limit is throttled and logged under event code CT-4420 rather than disconnected outright."
+          }
+        ],
+        "confidence": 0.93,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.93",
+        "final_query": "What is the ingestion rate limit for a single ColdTrace gateway, and what happens when a gateway exceeds it?",
+        "reranked": true,
+        "latency_ms": 4511,
+        "run_id": "caffa552-582a-401b-986c-e62bc26669b6",
+        "answer_id": "6c3e6e60-faf0-4ad5-8ca8-e142c36e48a1"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-09",
+      "question": "What is the target completion time for Riverside's Recovery Procedure R-7, and what time was actually measured in the most recent test?",
+      "profile": "explore",
+      "kind": "multi_hop",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-architecture.docx",
+        "quote": "is targeted to complete within 8 minutes end to end and is tested in full twice per year, most recently on 4 August 2025 with a measured completion time of 7 minutes 40 seconds",
+        "expected_answer": "Targeted at under 8 minutes end to end; the 4 August 2025 test completed in 7 minutes 40 seconds.",
+        "chunk_ids": [
+          "7a33e58f-9839-498a-b71c-3adfa08aa609",
+          "eaeafdea-a9de-4f47-a525-a8b31c3b2fa4"
+        ],
+        "chunk_indexes": [
+          36,
+          18
+        ]
+      },
+      "notes": "Stated in both Riverside documents; either passage is a legitimate citation.",
+      "result": {
+        "answer": "Riverside's Recovery Procedure R-7 has a target completion time of less than 8 minutes [1][2]. In the most recent live invocation on 4 August 2025, the actual measured completion time was 7 minutes 40 seconds [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "eaeafdea-a9de-4f47-a525-a8b31c3b2fa4",
+            "file_name": "riverside-scada-runbook.docx",
+            "section": "8. Recovery Procedure R-7: Field Execution",
+            "page": null,
+            "char_start": 10433,
+            "char_end": 12144,
+            "rerank_score": 0.91015625,
+            "excerpt": "Recovery Procedure R-7 restores the Tier 2 SCADA server pair following a total site failure at the Operations Center. The design summary is in RWU-ENG-014 Section 9; this section covers field-level execution detail.\n\n1. Confirm the standby server at Cedar Hills shows a replication lag under 60 seconds before proceeding; a longer lag means restored data may be stale by more than a minute.\n\n2. Run /opt/aquagrid/scripts/failover.sh from the Cedar Hills console, not remotely, since remote execution during a total site failure has failed twice in past drills.\n\n3. Watch the station reconnection coun"
+          },
+          {
+            "ordinal": 2,
+            "chunk_id": "14794026-d296-43d7-942c-c460514caca0",
+            "file_name": "riverside-scada-architecture.docx",
+            "section": "12. Performance Targets and Service Levels",
+            "page": null,
+            "char_start": 19956,
+            "char_end": 20320,
+            "rerank_score": 0.8359375,
+            "excerpt": "| Metric | Target | Measurement window |\n| --- | --- | --- |\n| Tier 2 server availability | 99.95% | Annual |\n| Field-to-HMI latency (95th percentile) | < 3 seconds | Per scan cycle |\n| Alarm false positive rate | < 2% | Rolling 30 days |\n| Radio packet loss alarm threshold | 5% | Rolling 1 hour |\n| Recovery Procedure R-7 completion | < 8 minutes | Per DR test |"
+          }
+        ],
+        "confidence": 0.873,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.91",
+        "final_query": "What is the target completion time for Riverside's Recovery Procedure R-7, and what time was actually measured in the most recent test?",
+        "reranked": true,
+        "latency_ms": 4850,
+        "run_id": "9ec6e20d-0fd9-4986-b72f-ab9769874201",
+        "answer_id": "a5ce4b75-690c-4e5c-ab19-7d7983795907"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 7,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-10",
+      "question": "How many flow sensors does Riverside operate in total, and how do they break down by type?",
+      "profile": "lookup",
+      "kind": "single_passage",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-architecture.docx",
+        "quote": "The utility operates 56 flow sensors in total: 41 magnetic flow meters at pump stations, 9 ultrasonic level sensors at reservoirs, and 6 Coriolis meters at treatment plant chemical dosing points",
+        "expected_answer": "56 in total: 41 magnetic flow meters at pump stations, 9 ultrasonic level sensors at reservoirs and 6 Coriolis meters at treatment plants.",
+        "chunk_ids": [
+          "100d8080-364b-4f77-83fb-62e8b3a81076"
+        ],
+        "chunk_indexes": [
+          10
+        ]
+      },
+      "notes": "Several other counts nearby (34 stations, 9 reservoirs, 3 plants) invite a wrong number.",
+      "result": {
+        "answer": "Riverside operates 56 flow sensors in total [1]. The flow sensors break down into 41 magnetic flow meters at pump stations, 9 ultrasonic level sensors at reservoirs, and 6 Coriolis meters at treatment plant chemical dosing points [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "100d8080-364b-4f77-83fb-62e8b3a81076",
+            "file_name": "riverside-scada-architecture.docx",
+            "section": "3. Component Inventory",
+            "page": null,
+            "char_start": 4836,
+            "char_end": 5329,
+            "rerank_score": 0.93359375,
+            "excerpt": "Pump stations use Schneider Electric Modicon M580 PLCs, model BMEP584040, running firmware 3.14.2 as of the last fleet-wide update completed 2 February 2025. Treatment plants use Allen-Bradley ControlLogix 5580 PLCs, model 1756-L85E, running firmware 33.011.\n\nThe utility operates 56 flow sensors in total: 41 magnetic flow meters at pump stations, 9 ultrasonic level sensors at reservoirs, and 6 Coriolis meters at treatment plant chemical dosing points.\n\nTable 3. Field hardware by site type"
+          }
+        ],
+        "confidence": 0.934,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash-lite",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.93",
+        "final_query": "How many flow sensors does Riverside operate in total, and how do they break down by type?",
+        "reranked": true,
+        "latency_ms": 4773,
+        "run_id": "4ebd31e0-1335-4496-a56b-9a2946d0903b",
+        "answer_id": "85b90780-1ebf-4cf1-9701-6c33c51c8d5c"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": true,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-11",
+      "question": "Under the DT3 consultant agreement, how much notice must the consultant give to terminate without cause, and how much must DT3 give?",
+      "profile": "lookup",
+      "kind": "single_passage",
+      "answerable_expected": true,
+      "expected": {
+        "document": "DT3_Offer Letter_Esandu copy.docx",
+        "quote": "may be terminated by Consultant, without cause, by giving 6 weeks of written notice to the other. DT3 can terminate without cause with 2 weeks",
+        "expected_answer": "The consultant must give 6 weeks' written notice; DT3 must give 2 weeks'. During probation DT3 can terminate with immediate effect.",
+        "chunk_ids": [
+          "90a8bb6e-8337-4046-9ef4-cc136f6322a1",
+          "4953d9c5-5cd4-4f60-95ea-ca5ee51e6e74"
+        ],
+        "chunk_indexes": [
+          0,
+          1
+        ]
+      },
+      "notes": "Real document, different register from the synthetic ones. Quote stops before a curly apostrophe.",
+      "result": {
+        "answer": "Under the DT3 consultant agreement, the consultant must give 6 weeks of written notice to terminate without cause [1][2]. DT3 can terminate the agreement without cause by giving 2 weeks' notice [1][2].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "4953d9c5-5cd4-4f60-95ea-ca5ee51e6e74",
+            "file_name": "DT3_Offer Letter_Esandu copy.docx",
+            "section": "",
+            "page": null,
+            "char_start": 1631,
+            "char_end": 3361,
+            "rerank_score": 0.87890625,
+            "excerpt": "Termination: This agreement is governed by “Employment at-will” and may be terminated by Consultant, without cause, by giving 6 weeks of written notice to the other. DT3 can terminate without cause with 2 weeks’ notice. During the probation period the company can terminate with immediate effect.   Such termination shall not prejudice any remedy which either party may have against the other either at law, in equity or under this agreement.\n\nScope: Consultant shall perform services in the role of Associate Software Engineer for DT3/Client, at the direction of DT3/Client, pursuant to the contract"
+          },
+          {
+            "ordinal": 2,
+            "chunk_id": "90a8bb6e-8337-4046-9ef4-cc136f6322a1",
+            "file_name": "DT3_Offer Letter_Esandu copy.docx",
+            "section": "",
+            "page": null,
+            "char_start": 0,
+            "char_end": 1850,
+            "rerank_score": 0.87890625,
+            "excerpt": "This agreement is made on 4-Sept-2026 between DigitalT3 LLC. (“DT3”) with offices located 2347 Country Club Dr, Avon, OH 44011 and  Don Esandu Meth Obadaarachchi(“Consultant”), residing at [REDACTED ADDRESS]\n\nTerm: This agreement will become effective on or about 14th Sept 2026 and the probation period is for 3 months from date of joining.\n\nCommencement: Commencement of the contract (and the start date) are contingent up on completion of a satisfactory background check verification performed as per Client/or Company policy.\n\nCompensation: "
+          }
+        ],
+        "confidence": 0.879,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.88",
+        "final_query": "Under the DT3 consultant agreement, how much notice must the consultant give to terminate without cause, and how much must DT3 give?",
+        "reranked": true,
+        "latency_ms": 9557,
+        "run_id": "eb85cd52-c3ee-4416-adbd-c68dc217ab34",
+        "answer_id": "20b7c6e6-b0c3-4dc9-a2e6-6ce11f633d85"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-12",
+      "question": "What does the DT3 Code of Conduct say about the use of company email?",
+      "profile": "lookup",
+      "kind": "single_passage",
+      "answerable_expected": true,
+      "expected": {
+        "document": "DT3_Code_of_Conduct.docx",
+        "quote": "Use of company email is to be used only for official purposes",
+        "expected_answer": "Company email is to be used only for official purposes.",
+        "chunk_ids": [
+          "972a6902-2e42-44f1-bf64-2f9bedfdb5e6"
+        ],
+        "chunk_indexes": [
+          9
+        ]
+      },
+      "notes": "Short, unambiguous fact in a document whose other content is largely generic policy prose.",
+      "result": {
+        "answer": "The DT3 Code of Conduct states that the use of company email is to be used only for official purposes [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "972a6902-2e42-44f1-bf64-2f9bedfdb5e6",
+            "file_name": "DT3_Code_of_Conduct.docx",
+            "section": "Social Media and Online Conduct",
+            "page": null,
+            "char_start": 3575,
+            "char_end": 3876,
+            "rerank_score": 0.890625,
+            "excerpt": "8.1. Exercise caution when using social media or online platforms. Ensure that your actions do not reflect negatively on DigitalT3 and our clients.\n\n8.2. Respect the privacy of colleagues and clients when sharing information online.\n\n3.3. Use of company email is to be used only for official purposes."
+          }
+        ],
+        "confidence": 0.891,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.89",
+        "final_query": "What does the DT3 Code of Conduct say about the use of company email?",
+        "reranked": true,
+        "latency_ms": 10709,
+        "run_id": "63e6293f-c537-4642-a520-f3ecc1b7f2d5",
+        "answer_id": "b6122fba-92bb-4a23-823b-b84b7b373876"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-13",
+      "question": "How long does Northline retain audit logs, and what drives that retention period?",
+      "profile": "lookup",
+      "kind": "cross_doc",
+      "answerable_expected": true,
+      "expected": {
+        "document": "northline-coldchain-platform.docx",
+        "quote": "longer than Riverside",
+        "expected_answer": "3 years, because Northline's largest customer contract requires a 3-year minimum.",
+        "chunk_ids": [
+          "cf42ed26-e79b-45fc-ae31-37484cded771"
+        ],
+        "chunk_indexes": [
+          20
+        ]
+      },
+      "notes": "Hardest collision: the passage itself names Riverside, whose audit retention is 2 years.",
+      "result": {
+        "answer": "Northline retains audit logs for a period of 3 years [1][2]. This retention period is driven by Northline's largest customer contract, which requires a 3-year minimum [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "cf42ed26-e79b-45fc-ae31-37484cded771",
+            "file_name": "northline-coldchain-platform.docx",
+            "section": "5. Data Model and Retention Design > 5.2 Retention Design",
+            "page": null,
+            "char_start": 8225,
+            "char_end": 8821,
+            "rerank_score": 0.921875,
+            "excerpt": "The retention policy for raw telemetry is 45 days, after which values are rolled up to daily summaries and retained for 3 years to satisfy customer cold-chain compliance contracts.\n\nAudit log retention, covering dispatcher logins, manual overrides and alert acknowledgements, is set at 3 years, longer than Riverside's comparable audit retention because Northline's largest customer contract requires a 3-year minimum.\n\nA full backup of the compliance database runs every 6 hours, written to a geographically separate region within 2 hours of completion.\n\nTable 4. Retention summary by data class"
+          },
+          {
+            "ordinal": 2,
+            "chunk_id": "9c1d9951-3dcb-4bc2-959b-d40b44eb63c4",
+            "file_name": "northline-coldchain-platform.docx",
+            "section": "5. Data Model and Retention Design > 5.2 Retention Design",
+            "page": null,
+            "char_start": 8823,
+            "char_end": 9175,
+            "rerank_score": 0.8984375,
+            "excerpt": "| Data class | Raw retention | Aggregated form | Aggregated retention |\n| --- | --- | --- | --- |\n| Temperature and door telemetry | 45 days | Daily summary | 3 years |\n| Alert and event log | 6 months uncompressed | None | 6 months |\n| Audit log (logins, overrides) | 3 years | None | 3 years |\n| Calibration records | Indefinite | None | Indefinite |"
+          }
+        ],
+        "confidence": 0.91,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.92",
+        "final_query": "How long does Northline retain audit logs, and what drives that retention period?",
+        "reranked": true,
+        "latency_ms": 10751,
+        "run_id": "a4957bbe-7233-4b43-a986-3253af945469",
+        "answer_id": "221e26c2-bc0c-410a-8064-c4c60d9b59a4"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-14",
+      "question": "In the field, how long should an engineer wait for a ColdTrace gateway to fail over to satellite before intervening, and what should they do?",
+      "profile": "lookup",
+      "kind": "single_passage",
+      "answerable_expected": true,
+      "expected": {
+        "document": "northline-coldchain-fieldguide.docx",
+        "quote": "if failover has not visibly completed within 2 minutes on the gateway",
+        "expected_answer": "Wait 2 minutes on the diagnostic LED, then manually power-cycle the gateway - more conservative than the platform's 90-second design target.",
+        "chunk_ids": [
+          "486a5b6a-c4a9-47e3-85c0-d16b5d88c30a"
+        ],
+        "chunk_indexes": [
+          9
+        ]
+      },
+      "notes": "Deliberate disagreement with the platform document's 90-second failover window.",
+      "result": {
+        "answer": "In the field, an engineer should wait 2 minutes for the ColdTrace gateway to fail over to satellite [1]. If the failover has not visibly completed on the gateway's diagnostic LED within this timeframe, the engineer should manually power-cycle the gateway rather than continuing to wait [1].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "486a5b6a-c4a9-47e3-85c0-d16b5d88c30a",
+            "file_name": "northline-coldchain-fieldguide.docx",
+            "section": "4. Gateway Troubleshooting > 4.1 Cellular to Satellite Failover",
+            "page": null,
+            "char_start": 3734,
+            "char_end": 4403,
+            "rerank_score": 0.89453125,
+            "excerpt": "The platform's design failover window from cellular to Iridium satellite is 90 seconds. In the field, if failover has not visibly completed within 2 minutes on the gateway's diagnostic LED, manually power-cycle the gateway rather than continuing to wait, a more conservative rule than the platform's stated 90-second target, adopted after several units were observed to hang rather than fail over cleanly.\n\nGateways running firmware older than version 1.8 buffer only 72 hours of readings rather than the current 96-hour design capacity in NL-TEL-005 Section 4.3; check the firmware version before as"
+          }
+        ],
+        "confidence": 0.895,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.89",
+        "final_query": "In the field, how long should an engineer wait for a ColdTrace gateway to fail over to satellite before intervening, and what should they do?",
+        "reranked": true,
+        "latency_ms": 17669,
+        "run_id": "1a12ab8a-0548-4cec-bc09-8d24d9805a05",
+        "answer_id": "d1523340-d8e6-487f-9e8c-fd4eb1375b9e"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "G-15",
+      "question": "Which incident set Riverside's 72-hour local buffer sizing, and how long was that outage?",
+      "profile": "explore",
+      "kind": "multi_hop",
+      "answerable_expected": true,
+      "expected": {
+        "document": "riverside-scada-runbook.docx",
+        "quote": "The March 2023 ice storm caused a 61-hour outage at 11 stations served by the Ridgeline North repeater tower",
+        "expected_answer": "The March 2023 ice storm, a 61-hour outage affecting 11 stations served by the Ridgeline North repeater tower.",
+        "chunk_ids": [
+          "e02962e0-f633-4059-a121-9af7f4d26c5d",
+          "36fcfad4-ba37-4551-9839-45c155f14b37"
+        ],
+        "chunk_indexes": [
+          27,
+          18
+        ]
+      },
+      "notes": "Fact is split across both Riverside documents; either passage is acceptable.",
+      "result": {
+        "answer": "The March 2023 ice storm set Riverside's 72-hour local buffer sizing [1][2]. This outage lasted for 61 hours [1][2].",
+        "answerable": true,
+        "citations": [
+          {
+            "ordinal": 1,
+            "chunk_id": "e02962e0-f633-4059-a121-9af7f4d26c5d",
+            "file_name": "riverside-scada-runbook.docx",
+            "section": "13. History of Major Incidents",
+            "page": null,
+            "char_start": 16304,
+            "char_end": 17328,
+            "rerank_score": 0.91015625,
+            "excerpt": "This section summarises incidents that changed operating procedure, kept for context when a similar pattern reappears.\n\nThe March 2023 ice storm caused a 61-hour outage at 11 stations served by the Ridgeline North repeater tower, the longest outage on record, and led directly to the current 72-hour local buffer sizing described in RWU-ENG-014 Section 4.3.\n\nThe 2021 fleet-wide battery failure, in which units testing healthy at 20 months failed within weeks, led to the current fixed 24-month replacement interval regardless of measured battery condition.\n\nThe March 2025 north zone communication o"
+          },
+          {
+            "ordinal": 2,
+            "chunk_id": "36fcfad4-ba37-4551-9839-45c155f14b37",
+            "file_name": "riverside-scada-architecture.docx",
+            "section": "4. Communication Protocols and Network Topology > 4.3 Local Buffering and Message Handling",
+            "page": null,
+            "char_start": 8304,
+            "char_end": 8723,
+            "rerank_score": 0.85546875,
+            "excerpt": "Local buffering at each RTU holds 72 hours of readings at the default 30-second scan rate, sized to survive the longest historically observed communication outage, which was 61 hours during the March 2023 ice storm.\n\nThe queue depth limit on the SCADA server's inbound message broker is 10,000 messages; once exceeded, the oldest messages are dropped and an internal alarm, ERR-9002, is raised for the integration team."
+          }
+        ],
+        "confidence": 0.883,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": false,
+        "flag_reasons": [],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.91",
+        "final_query": "Which incident set Riverside's 72-hour local buffer sizing, and how long was that outage?",
+        "reranked": true,
+        "latency_ms": 10038,
+        "run_id": "160a445e-cf02-4ae9-a537-0be28acca8d8",
+        "answer_id": "89c562c9-cd83-4a8b-84a6-cde2c59c6233"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": true,
+        "rank_of_expected": 1,
+        "reciprocal_rank": 1.0,
+        "retrieved_count": 6,
+        "expected_chunk_cited": true,
+        "cited_position_of_expected": 1,
+        "answered_by_fallback_model": false,
+        "refused": false,
+        "refusal_correct": null
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "R-01",
+      "question": "What is Riverside Water Utility's annual operating budget?",
+      "profile": "lookup",
+      "kind": "unanswerable",
+      "answerable_expected": false,
+      "expected": {
+        "document": null,
+        "quote": null,
+        "expected_answer": "Should refuse: no budget figure appears anywhere in the corpus.",
+        "chunk_ids": [],
+        "chunk_indexes": []
+      },
+      "notes": "Plausible for the domain, entirely absent.",
+      "result": {
+        "answer": "The provided workspace documents do not contain information about Riverside Water Utility's annual operating budget.",
+        "answerable": false,
+        "citations": [],
+        "confidence": 0.0,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": true,
+        "flag_reasons": [
+          "not_answerable_from_documents",
+          "low_confidence"
+        ],
+        "model": "gemini-3.5-flash",
+        "attempts": 2,
+        "grade": "weak",
+        "grade_note": "graded weak (borderline score 0.40)",
+        "final_query": "What is Riverside Water Utility's annual operating budget?",
+        "reranked": true,
+        "latency_ms": 13348,
+        "run_id": "83f1aa5c-9419-4e57-8710-cb0b92ff29d3",
+        "answer_id": "75f0ca04-d33f-47a4-b4ca-bf5326e51727"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": false,
+        "rank_of_expected": null,
+        "reciprocal_rank": 0.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": false,
+        "cited_position_of_expected": null,
+        "answered_by_fallback_model": false,
+        "refused": true,
+        "refusal_correct": true
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "R-02",
+      "question": "What is the mailing address of Northline Logistics' Depot East?",
+      "profile": "lookup",
+      "kind": "unanswerable",
+      "answerable_expected": false,
+      "expected": {
+        "document": null,
+        "quote": null,
+        "expected_answer": "Should refuse: depots are named and counted, but no address is given.",
+        "chunk_ids": [],
+        "chunk_indexes": []
+      },
+      "notes": "The depot exists in a table, tempting a confident but unsupported answer.",
+      "result": {
+        "answer": "The workspace documents do not contain the mailing address of Northline Logistics' Depot East.",
+        "answerable": false,
+        "citations": [],
+        "confidence": 0.0,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": true,
+        "flag_reasons": [
+          "not_answerable_from_documents",
+          "low_confidence"
+        ],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.54",
+        "final_query": "What is the mailing address of Northline Logistics' Depot East?",
+        "reranked": true,
+        "latency_ms": 10067,
+        "run_id": "14ba8faa-e08d-47f5-9ec6-97c63def910e",
+        "answer_id": "fa947b25-7852-49ec-9d31-d6ebd2cfa0d3"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": false,
+        "rank_of_expected": null,
+        "reciprocal_rank": 0.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": false,
+        "cited_position_of_expected": null,
+        "answered_by_fallback_model": false,
+        "refused": true,
+        "refusal_correct": true
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "R-03",
+      "question": "What does Northline pay per gigabyte for Iridium satellite data?",
+      "profile": "lookup",
+      "kind": "unanswerable",
+      "answerable_expected": false,
+      "expected": {
+        "document": null,
+        "quote": null,
+        "expected_answer": "Should refuse: the documents say satellite is billed separately at a higher per-byte cost, but give no rate.",
+        "chunk_ids": [],
+        "chunk_indexes": []
+      },
+      "notes": "Adjacent facts exist, the number does not.",
+      "result": {
+        "answer": "The workspace documents do not cover the specific price per gigabyte that Northline pays for Iridium satellite data.",
+        "answerable": false,
+        "citations": [],
+        "confidence": 0.0,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": true,
+        "flag_reasons": [
+          "not_answerable_from_documents",
+          "low_confidence"
+        ],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.53",
+        "final_query": "What does Northline pay per gigabyte for Iridium satellite data?",
+        "reranked": true,
+        "latency_ms": 8280,
+        "run_id": "fd2da8ff-b86f-432a-b201-69fe67582150",
+        "answer_id": "b72e4010-bed7-43cb-9d1c-6bf35399606e"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": false,
+        "rank_of_expected": null,
+        "reciprocal_rank": 0.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": false,
+        "cited_position_of_expected": null,
+        "answered_by_fallback_model": false,
+        "refused": true,
+        "refusal_correct": true
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "R-04",
+      "question": "Which Riverside engineer is holding the on-call pager this week?",
+      "profile": "lookup",
+      "kind": "unanswerable",
+      "answerable_expected": false,
+      "expected": {
+        "document": null,
+        "quote": null,
+        "expected_answer": "Should refuse: the rotation is described but no individual is named.",
+        "chunk_ids": [],
+        "chunk_indexes": []
+      },
+      "notes": "Tests refusal where structure is documented but the specific fact is not.",
+      "result": {
+        "answer": "The workspace documents do not cover which specific Riverside engineer is holding the on-call pager this week.",
+        "answerable": false,
+        "citations": [],
+        "confidence": 0.0,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": true,
+        "flag_reasons": [
+          "not_answerable_from_documents",
+          "low_confidence"
+        ],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.58",
+        "final_query": "Which Riverside engineer is holding the on-call pager this week?",
+        "reranked": true,
+        "latency_ms": 9835,
+        "run_id": "7ec0fcaa-8076-4a23-aef7-b444ae21e570",
+        "answer_id": "51825263-04a4-4650-b79e-1c521c01a724"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": false,
+        "rank_of_expected": null,
+        "reciprocal_rank": 0.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": false,
+        "cited_position_of_expected": null,
+        "answered_by_fallback_model": false,
+        "refused": true,
+        "refusal_correct": true
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "R-05",
+      "question": "What is the calibration interval for ColdTrace's magnetic flow meters?",
+      "profile": "lookup",
+      "kind": "unanswerable",
+      "answerable_expected": false,
+      "expected": {
+        "document": null,
+        "quote": null,
+        "expected_answer": "Should refuse: ColdTrace has no magnetic flow meters; those are Riverside equipment. ColdTrace calibrates Thermatrak TT-500 probes every 120 days.",
+        "chunk_ids": [],
+        "chunk_indexes": []
+      },
+      "notes": "Category error across projects. The likely wrong answers are 120 days (Northline probes) or 180 days (Riverside meters).",
+      "result": {
+        "answer": "The workspace documents do not cover the calibration interval for ColdTrace's magnetic flow meters.",
+        "answerable": false,
+        "citations": [],
+        "confidence": 0.0,
+        "confidence_label": "uncalibrated",
+        "grounded": true,
+        "unsupported": [],
+        "flagged": true,
+        "flag_reasons": [
+          "not_answerable_from_documents",
+          "low_confidence"
+        ],
+        "model": "gemini-3.5-flash",
+        "attempts": 1,
+        "grade": "good",
+        "grade_note": "confident on rerank score 0.77",
+        "final_query": "What is the calibration interval for ColdTrace's magnetic flow meters?",
+        "reranked": true,
+        "latency_ms": 10989,
+        "run_id": "ae0faa1a-54c3-4e4d-91c2-afd9f84f3a39",
+        "answer_id": "05ce8970-bf2e-4687-bec0-6706b2f03154"
+      },
+      "auto_score": {
+        "expected_chunk_retrieved": false,
+        "rank_of_expected": null,
+        "reciprocal_rank": 0.0,
+        "retrieved_count": 5,
+        "expected_chunk_cited": false,
+        "cited_position_of_expected": null,
+        "answered_by_fallback_model": false,
+        "refused": true,
+        "refusal_correct": true
+      },
+      "grading": {
+        "answer_correct": null,
+        "citation_acceptable": null,
+        "notes": ""
+      }
+    }
+  ]
+}
