@@ -152,7 +152,7 @@ def resolve(corpus: Corpus, question: GoldenQuestion) -> Resolved:
     if document is not None and document.parsed_status != "ready":
         return Resolved(question, document, [], [], f"{document.file_name} is {document.parsed_status}, not ready")
 
-    searched = [document] if document is not None else corpus.ready
+    named = [document] if document is not None else corpus.ready
     quotes = [question.expected_quote, *question.also_acceptable]
 
     chunk_ids: list[str] = []
@@ -160,9 +160,14 @@ def resolve(corpus: Corpus, question: GoldenQuestion) -> Resolved:
     straddled: list[str] = []
     missing: list[str] = []
 
-    for quote in quotes:
+    for position, quote in enumerate(quotes):
         if not quote:
             continue
+        # The expected quote is looked for in the document the question names.
+        # Alternates are looked for across the whole corpus: a fact stated in two
+        # documents is legitimately citable from either, and scoping them to the
+        # named document would mark a correct citation wrong.
+        searched = named if position == 0 else corpus.ready
         hits: list[tuple[Document, QuoteMatch]] = []
         for candidate in searched:
             hits.extend((candidate, m) for m in find_quote(candidate.content_text, quote))

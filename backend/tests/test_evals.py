@@ -169,3 +169,20 @@ def test_a_reviewer_can_reject_a_passage_the_auto_score_accepted():
 def test_an_ungraded_record_falls_back_to_the_auto_score():
     assert report._cited(_record(True)) is True
     assert report._cited(_record(False)) is False
+
+
+def test_an_alternate_quote_is_found_in_another_document(tmp_path):
+    """A fact stated in two documents is citable from either, so alternates are
+    searched across the corpus rather than only in the document the question names."""
+    corpus = _corpus()
+    other_text = "A second document repeats it: the gateway waits up to five attempts before failing."
+    corpus.documents.append(
+        corpus_mod.Document(
+            "d2", "summary.docx", "ready", 1, 1, other_text,
+            [corpus_mod.Chunk("c3", "d2", 0, 0, len(other_text), "Summary", 1, other_text)],
+        )
+    )
+    question = _load_one(tmp_path, _question(also_acceptable=["waits up to five attempts before failing"]))
+    resolved = corpus_mod.resolve(corpus, question)
+    assert resolved.ok
+    assert set(resolved.expected_chunk_ids) == {"c1", "c3"}

@@ -51,6 +51,13 @@ async def main() -> int:
     parser.add_argument("--workspace", help="workspace id or a unique part of its name")
     parser.add_argument("--retrieval-only", action="store_true", help="no generation calls; spends no answer quota")
     parser.add_argument("--only", help="comma-separated question ids, to run part of the set")
+    parser.add_argument(
+        "--pace",
+        type=float,
+        default=0.0,
+        help="seconds to wait between questions. The Voyage free tier without a payment method allows "
+        "3 rerank requests a minute, so an unpaced run silently loses reranking; use 25 there.",
+    )
     parser.add_argument("--out", type=Path, help="results file (default: evals/results/<mode>-<stamp>.json)")
     args = parser.parse_args()
 
@@ -93,6 +100,8 @@ async def main() -> int:
         records: list[dict[str, Any]] = []
         for number, question in enumerate(questions, start=1):
             expected = resolutions[question.id]
+            if args.pace and number > 1:
+                await asyncio.sleep(args.pace)
             say(f"[{number}/{len(questions)}] {question.id}  {question.question[:70]}")
             try:
                 if mode == "retrieval":
@@ -107,6 +116,13 @@ async def main() -> int:
                 break
             records.append(record)
             say("    " + _one_line(record, mode))
+
+        unreranked = [r for r in records if r.get("result", {}).get("reranked") is False]
+        if unreranked:
+            say()
+            say(f"WARNING: {len(unreranked)} of {len(records)} questions ran WITHOUT reranking.")
+            say("The rerank score is the retrieval grade (D-030) and the basis of the confidence")
+            say("value (D-027), so these results are not a valid measurement. Re-run with --pace 25.")
 
         out = args.out or (RESULTS_DIR / f"{mode}-{now_stamp()}.json")
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -125,6 +141,8 @@ async def main() -> int:
                 },
                 "configured_answer_model": settings.gemini_answer_model,
                 "configured_fast_model": settings.gemini_fast_model,
+                "pace_seconds": args.pace,
+                "questions_without_rerank": len(unreranked),
             },
             "questions": records,
         }
