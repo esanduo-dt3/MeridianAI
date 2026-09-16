@@ -4,7 +4,7 @@ Newest first. Each entry states what exists, the verification recorded when that
 
 ## Current source-control status
 
-`dev` is at `e9818ce` (`Merge feature/ingestion-preview into dev`) and is pushed to `origin/dev`. It now carries the free-tier embedding pacing ([D-033](decisions.md#d-033)) and the ingestion passage preview ([D-034](decisions.md#d-034)) on top of the earlier retrieval, notes, documents, tasks and workspace work. The Ask page is on `feature/ask-page`, not yet merged. The `main` branch remains at the initial repository baseline commit, `5766775`.
+`dev` is at `818206c` (`Merge feature/ask-page into dev`), which is **2 commits ahead of `origin/dev`**: the push was blocked locally and is still pending. The Ask page is merged; the golden-set eval harness is on `feature/golden-eval`, not merged. It carries the free-tier embedding pacing ([D-033](decisions.md#d-033)), the ingestion passage preview ([D-034](decisions.md#d-034)) and the Ask page ([D-035](decisions.md#d-035)) on top of the earlier retrieval, notes, documents, tasks and workspace work. The `main` branch remains at the initial repository baseline commit, `5766775`.
 
 ## Gate status
 
@@ -14,6 +14,16 @@ Newest first. Each entry states what exists, the verification recorded when that
 | G2: propose, approve and write round trip | End of Day 4 | Not yet run |
 
 ## Day 2 (2026-09-16)
+
+### Part 11: Golden set eval harness (committed on `feature/golden-eval`)
+
+- **Built.** `backend/evals/`, run from `backend/` with the service role, so no browser sign-in and no test accounts ([D-036](decisions.md#d-036)).
+  - `evals.ingest` — ingests a folder into a workspace one document at a time, skips documents already ready so a run stopped by the daily embedding quota resumes the next day, and only accepts `ready` when every passage is embedded. Warns when the corpus is under ~150 passages, where `lookup` keeping 5 of 20 candidates makes G1 pass almost by construction.
+  - `evals.validate` — resolves every expected quote to a passage with **no model calls**, folding whitespace, case and curly punctuation, and refuses the dataset if a quote is missing or straddles a passage boundary.
+  - `evals.run` — `--retrieval-only` (no generation calls at all) and the full measured run. Scores retrieval rank, reciprocal rank and whether the expected passage was cited; leaves a `grading` block per question for a person.
+  - `evals.report` — the G1 verdict plus retrieval, answer-quality, operational and confidence-separation metrics, and a markdown view of every answer with its cited passages for grading against. Warns when any gate question was answered by a fallback model.
+- **Verified.** `pytest`: **81 passed** (63 existing + 18 new covering quote folding, exact offsets, straddled boundaries, missing quotes, unready documents, dataset validation and the reviewer override). The report and markdown view were smoke-tested end to end on a synthetic 15-question run, including the override path and the fallback-model warning. Workspace resolution was checked live against Supabase through the service role.
+- **Not yet run.** No corpus and no golden set yet; both come from the owner. No Gemini quota has been spent.
 
 ### Part 10: Ask page (committed on `feature/ask-page`)
 

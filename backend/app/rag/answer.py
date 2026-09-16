@@ -286,6 +286,9 @@ async def record_answer(
             "flagged": outcome.flagged,
             "flag_reasons": outcome.flag_reasons,
             "general_knowledge": False,
+            # Which model actually answered. The gateway falls back across models
+            # on the free tier, and answer quality moves with it (D-031, D-032).
+            "model": outcome.model,
         },
         select="id",
     )

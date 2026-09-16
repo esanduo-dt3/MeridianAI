@@ -73,6 +73,11 @@ function RecentAnswerRow({ answer }: { answer: AnswerListItem }) {
             <ConfidenceReadout confidence={answer.confidence} />
             <GroundednessBadge grounded={answer.groundedness_pass} />
             {answer.flagged && <FlaggedBadge />}
+            {answer.model && (
+              <span className="font-mono text-[11px] text-ink-3" title="The model that answered. Free-tier fallbacks change it.">
+                {answer.model}
+              </span>
+            )}
           </span>
         </span>
       </summary>
