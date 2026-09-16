@@ -234,3 +234,47 @@ export interface AnswerListItem {
   /** Null for answers recorded before the model column existed (D-031). */
   model: string | null
 }
+
+/* The workspace agent (backend/app/api/agent_chat.py). */
+
+export interface ChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface AgentStep {
+  tool: string
+  arguments: Record<string, unknown>
+  ok: boolean
+  summary: string
+}
+
+export interface AgentProposal {
+  id: string
+  title: string
+  description?: string
+  priority?: Priority
+  due_date?: string
+  assignee_email?: string | null
+  reasoning: string
+  created_at: string
+}
+
+export interface AgentTaskRef {
+  id: string
+  title: string
+  status: TaskStatus
+  priority: Priority
+  due_date: string | null
+  assignee: string | null
+}
+
+export interface ChatResponse {
+  reply: string
+  steps: AgentStep[]
+  proposals: AgentProposal[]
+  tasks: AgentTaskRef[]
+  citations: Citation[]
+  injection_detected: boolean
+  models: string[]
+}
