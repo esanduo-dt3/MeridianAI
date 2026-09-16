@@ -29,7 +29,7 @@ import logging
 import math
 import re
 import time
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Literal, Protocol
@@ -43,6 +43,51 @@ EmbedTask = Literal["document", "query"]
 
 class ModelError(RuntimeError):
     """A model call failed after retries, or the provider is not configured."""
+
+
+class QuotaExceeded(ModelError):
+    """The provider refused the call for quota. `daily` when waiting a minute will not help."""
+
+    def __init__(self, message: str, *, daily: bool):
+        super().__init__(message)
+        self.daily = daily
+
+
+def _is_quota_error(exc: BaseException) -> bool:
+    text = str(exc)
+    return "RESOURCE_EXHAUSTED" in text or text.startswith("429")
+
+
+def _retry_after(exc: BaseException) -> float | None:
+    """The wait a quota error names ("Please retry in 33.5s"), if any."""
+    match = re.search(r"retry in ([\d.]+)s", str(exc))
+    return float(match.group(1)) if match else None
+
+
+class _RateWindow:
+    """Items sent in the last minute, to stay under a per-minute request quota.
+
+    The free Gemini tier counts every text in an embedding batch as one request,
+    100 a minute (D-033). `reserve` keeps headroom so that a question asked while a
+    large document is ingesting does not wait for the whole window.
+    """
+
+    def __init__(self, per_minute: int, clock=time.monotonic, sleep=asyncio.sleep):
+        self.per_minute = per_minute
+        self._sent: deque[tuple[float, int]] = deque()
+        self._clock = clock
+        self._sleep = sleep
+
+    def _used(self, now: float) -> int:
+        while self._sent and now - self._sent[0][0] >= 60:
+            self._sent.popleft()
+        return sum(count for _, count in self._sent)
+
+    async def acquire(self, count: int, reserve: int = 0) -> None:
+        limit = max(self.per_minute - reserve, 1)
+        while self._sent and self._used(self._clock()) + count > limit:
+            await self._sleep(60 - (self._clock() - self._sent[0][0]) + 0.5)
+        self._sent.append((self._clock(), count))
 
 
 @dataclass(frozen=True)
@@ -102,7 +147,8 @@ class GeminiProvider:
         self._thinking_level = thinking_level
         self._client = genai.Client(
             api_key=api_key,
-            http_options=types.HttpOptions(timeout=int(timeout_seconds * 1000)),
+            # The gateway enforces the real deadlines; this only stops a hung socket.
+            http_options=types.HttpOptions(timeout=int(timeout_seconds * 4000)),
         )
 
     async def generate(
@@ -148,13 +194,15 @@ class GeminiProvider:
 
 
 class ModelGateway:
-    def __init__(self, provider: Provider):
+    def __init__(self, provider: Provider, *, clock=time.monotonic, sleep=asyncio.sleep):
         settings = get_settings()
+        self._sleep = sleep
         self._provider = provider
         self._settings = settings
         self._responses = _LRU(settings.response_cache_entries)
         self._embeddings = _LRU(settings.response_cache_entries * 4)
         self._cooling: dict[str, float] = {}
+        self._embed_window = _RateWindow(settings.embed_requests_per_minute, clock=clock, sleep=sleep)
 
     async def _with_retry(self, label: str, call, attempts: int = 3):
         delay = 0.8
@@ -182,8 +230,7 @@ class ModelGateway:
 
     def _cool_down(self, model: str, exc: BaseException) -> None:
         # Quota errors say how long to wait ("retry in 46.08s"); use that when given.
-        match = re.search(r"retry in ([\d.]+)s", str(exc))
-        seconds = float(match.group(1)) if match else self._settings.model_cooldown_seconds
+        seconds = _retry_after(exc) or self._settings.model_cooldown_seconds
         self._cooling[model] = time.monotonic() + min(seconds, 3600)
 
     async def generate(
@@ -237,20 +284,53 @@ class ModelGateway:
         keys = [_key("embed", model, task, dims, t) for t in texts]
         results: list[list[float] | None] = [self._embeddings.get(k) for k in keys]
         missing = [i for i, r in enumerate(results) if r is None]
-        if missing:
-            fresh = await self._with_retry(
-                f"embed:{model}",
-                lambda: self._provider.embed(model=model, texts=[texts[i] for i in missing], task=task, dimensions=dims),
-            )
-            if len(fresh) != len(missing):
-                raise ModelError(f"embed:{model} returned {len(fresh)} vectors for {len(missing)} inputs")
-            for i, vector in zip(missing, fresh):
+        batch_size = max(1, min(self._settings.embed_batch_size, self._embed_window.per_minute))
+        # Documents leave headroom in the window so questions are not held up.
+        reserve = min(10, self._embed_window.per_minute // 10) if task == "document" else 0
+        for start in range(0, len(missing), batch_size):
+            batch = missing[start : start + batch_size]
+            await self._embed_window.acquire(len(batch), reserve=reserve)
+            fresh = await self._embed_batch(model, [texts[i] for i in batch], task, dims)
+            if len(fresh) != len(batch):
+                raise ModelError(f"embed:{model} returned {len(fresh)} vectors for {len(batch)} inputs")
+            for i, vector in zip(batch, fresh):
                 if len(vector) != dims:
                     raise ModelError(f"embed:{model} returned {len(vector)} dimensions, expected {dims}")
                 unit = _normalise(vector)
                 results[i] = unit
                 self._embeddings.put(keys[i], unit)
         return [r for r in results if r is not None]
+
+    async def _embed_batch(self, model: str, texts: list[str], task: EmbedTask, dims: int) -> list[list[float]]:
+        """One batch, retried. A per-minute quota error waits as long as the provider asks.
+
+        There is no model fallback here: vectors from another embedding model would
+        not be comparable with the ones already stored.
+        """
+        attempts = 5
+        delay = 0.8
+        for attempt in range(attempts):
+            try:
+                return await asyncio.wait_for(
+                    self._provider.embed(model=model, texts=texts, task=task, dimensions=dims),
+                    self._settings.llm_timeout_seconds * 4,
+                )
+            except Exception as exc:  # noqa: BLE001 - provider errors vary by SDK version
+                quota = _is_quota_error(exc)
+                wait = _retry_after(exc)
+                daily = quota and ("PerDay" in str(exc) or (wait or 0) > 120)
+                if daily or attempt == attempts - 1:
+                    log.warning("embed:%s failed after %d attempt(s): %r", model, attempt + 1, exc)
+                    if quota:
+                        raise QuotaExceeded(f"embed:{model} quota exceeded: {exc!r}", daily=daily) from exc
+                    raise ModelError(f"embed:{model} failed: {exc!r}") from exc
+                if quota:
+                    log.info("embed:%s hit the per-minute quota, waiting %.0fs", model, (wait or 30) + 1)
+                    await self._sleep((wait or 30) + 1)
+                else:
+                    await self._sleep(delay)
+                    delay *= 2
+        raise ModelError(f"embed:{model} failed")
 
 
 @lru_cache

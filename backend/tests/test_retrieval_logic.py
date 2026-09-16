@@ -158,3 +158,72 @@ def test_gateway_falls_back_along_the_chain_and_skips_a_cooling_model():
     assert first.model == second.model == fallback
     # The quota error puts the answer model on a cooldown, so the second call skips it.
     assert calls == [settings.gemini_answer_model, fallback, fallback]
+
+
+class _FakeClock:
+    def __init__(self):
+        self.now = 0.0
+        self.slept: list[float] = []
+
+    def __call__(self) -> float:
+        return self.now
+
+    async def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def _embed_gateway(provider, clock):
+    from app.llm.gateway import ModelGateway
+
+    return ModelGateway(provider, clock=clock, sleep=clock.sleep)
+
+
+def test_document_embedding_is_paced_under_the_per_minute_quota():
+    from app.core.config import get_settings
+
+    dims = get_settings().embed_dim
+    batches: list[tuple[float, int]] = []
+    clock = _FakeClock()
+
+    class Provider:
+        async def embed(self, *, texts, **_):
+            batches.append((clock.now, len(texts)))
+            return [[1.0] + [0.0] * (dims - 1) for _ in texts]
+
+    vectors = asyncio.run(_embed_gateway(Provider(), clock).embed([f"chunk {i}" for i in range(159)], "document"))
+    assert len(vectors) == 159
+    # 100 texts go at once; the other 59 wait for the one-minute window to clear.
+    assert batches == [(0.0, 100), (60.5, 59)]
+
+
+def test_embedding_waits_as_long_as_a_quota_error_asks_then_succeeds():
+    from app.core.config import get_settings
+
+    dims = get_settings().embed_dim
+    clock = _FakeClock()
+    calls = {"n": 0}
+
+    class Provider:
+        async def embed(self, *, texts, **_):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("429 RESOURCE_EXHAUSTED. EmbedContentRequestsPerMinute. Please retry in 33.5s.")
+            return [[0.0, 1.0] + [0.0] * (dims - 2) for _ in texts]
+
+    vectors = asyncio.run(_embed_gateway(Provider(), clock).embed(["a", "b"], "document"))
+    assert len(vectors) == 2 and clock.slept == [34.5]
+
+
+def test_a_daily_embedding_quota_fails_fast_with_a_clear_type():
+    from app.llm.gateway import QuotaExceeded
+
+    clock = _FakeClock()
+
+    class Provider:
+        async def embed(self, **_):
+            raise RuntimeError("429 RESOURCE_EXHAUSTED. EmbedContentRequestsPerDayPerProject. Please retry in 40000s.")
+
+    with pytest.raises(QuotaExceeded) as caught:
+        asyncio.run(_embed_gateway(Provider(), clock).embed(["a"], "document"))
+    assert caught.value.daily and clock.slept == []
