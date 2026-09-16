@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     supabase_url: str = Field(pattern=r"^https://")
     supabase_publishable_key: SecretStr
     supabase_service_role_key: SecretStr
+    # One origin, or several separated by commas (production and a preview URL).
+    # "*" is refused: the API is called with credentials.
     frontend_origin: str = "http://localhost:5173"
     environment: Literal["local", "staging", "production", "test"] = "local"
 
@@ -38,6 +40,22 @@ class Settings(BaseSettings):
     model_cooldown_seconds: float = 120.0
     response_cache_entries: int = 512                    # in-process cache of identical model calls
 
+    # --- Per-user rate limits (D-041) ---
+    # Each question spends shared model quota, so one person or a looping script
+    # must not be able to exhaust the day's quota for everyone.
+    rate_limit_ask_per_minute: int = 6
+    rate_limit_ask_per_hour: int = 60
+    rate_limit_chat_per_minute: int = 10
+    rate_limit_chat_per_hour: int = 120
+    rate_limit_upload_per_minute: int = 10
+    rate_limit_upload_per_hour: int = 60
+
+    # --- Upload limits (D-041) ---
+    max_docx_uncompressed_bytes: int = 200 * 1024 * 1024
+    max_docx_entries: int = 5000
+    max_pdf_pages: int = 1500
+    max_passages_per_document: int = 3000
+
     # --- Reranking ---
     voyage_api_key: SecretStr | None = None
     voyage_rerank_model: str = "rerank-2.5"
@@ -56,6 +74,13 @@ class Settings(BaseSettings):
     retrieval_max_attempts: int = 2
     # Answers below this uncalibrated confidence are flagged for admin review.
     review_confidence_threshold: float = 0.35
+
+    @property
+    def cors_origins(self) -> list[str]:
+        origins = [o.strip().rstrip("/") for o in self.frontend_origin.split(",") if o.strip()]
+        if not origins or "*" in origins:
+            raise ValueError("FRONTEND_ORIGIN must list explicit origins; '*' is not allowed with credentials")
+        return origins
 
     @property
     def supabase_issuer(self) -> str:

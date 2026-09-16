@@ -16,10 +16,11 @@ from pydantic import BaseModel
 
 from app.core import audit, storage
 from app.core.security import AuthenticatedUser, get_current_user
+from app.core.ratelimit import rate_limit
 from app.core.supabase import Db, service_db, user_db
 from app.core.workspace import WorkspaceContext, get_workspace_context, require_admin
 from app.rag.ingest import process_document
-from app.rag.parse import ALLOWED_MIME, MAX_UPLOAD_BYTES, UnsupportedDocument, detect_type
+from app.rag.parse import ALLOWED_MIME, MAX_UPLOAD_BYTES, UnsupportedDocument, check_file, detect_type
 
 router = APIRouter(tags=["documents"])
 
@@ -102,7 +103,7 @@ async def get_document(document_id: str, context: WorkspaceContext = Depends(get
     return DocumentDetail(**rows[0], chunks=infos)
 
 
-@router.post("/documents/upload", response_model=DocumentSummary, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/documents/upload", response_model=DocumentSummary, status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(rate_limit("upload"))])
 async def upload_document(
     background: BackgroundTasks,
     file: UploadFile = File(...),
@@ -122,6 +123,10 @@ async def upload_document(
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "The file is larger than 25 MB")
     if not data:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "The file is empty")
+    try:
+        check_file(doc_type, data)
+    except UnsupportedDocument as exc:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(exc)) from exc
 
     content_hash = hashlib.sha256(data).hexdigest()
     duplicate = await db.select(
@@ -179,7 +184,7 @@ async def upload_document(
     return DocumentSummary(**row)
 
 
-@router.post("/documents/{document_id}/reprocess", response_model=DocumentSummary, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/documents/{document_id}/reprocess", response_model=DocumentSummary, status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(rate_limit("upload"))])
 async def reprocess_document(
     document_id: str,
     background: BackgroundTasks,

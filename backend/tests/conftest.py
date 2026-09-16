@@ -57,3 +57,13 @@ def as_admin():
     _signed_in_as("Admin")
     yield
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Rate-limit windows are process state; no test may inherit another's."""
+    from app.core.ratelimit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()

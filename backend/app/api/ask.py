@@ -16,11 +16,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, StringConstraints
 
+from app.core.ratelimit import rate_limit
 from app.core.supabase import Db, service_db, user_db
 from app.core.workspace import WorkspaceContext, get_workspace_context
 from app.llm.gateway import ModelError
 from app.rag.answer import CONFIDENCE_BASIS, CONFIDENCE_LABEL, generate_answer, record_answer
-from app.rag.guardrails import sanitise_input
+from app.rag.guardrails import redact_secrets, sanitise_input
 from app.rag.retrieval import agentic_retrieve
 
 router = APIRouter(tags=["agent"])
@@ -77,7 +78,7 @@ class AskResponse(BaseModel):
     model: str
 
 
-@router.post("/agent/ask", response_model=AskResponse)
+@router.post("/agent/ask", response_model=AskResponse, dependencies=[Depends(rate_limit("ask"))])
 async def ask(
     body: AskRequest,
     context: WorkspaceContext = Depends(get_workspace_context),
@@ -86,6 +87,8 @@ async def ask(
 ):
     started = time.perf_counter()
     question = sanitise_input(body.question, limit=MAX_QUESTION_CHARS)
+    # A pasted key never reaches the model, the database or the audit log (D-041).
+    question, _ = redact_secrets(question)
     if len(question) < 3:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Ask a question of at least a few words")
 

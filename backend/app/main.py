@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import admin, agent_actions, agent_chat, ask, documents, health, me, members, notes, tasks, workspaces
 from app.core.config import get_settings
+from app.core.security_headers import SecurityHeadersMiddleware
 
 
 def create_app() -> FastAPI:
@@ -15,11 +16,14 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.frontend_origin],
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Workspace-Id"],
     )
+    # Added last, so it is the outermost middleware and also covers the preflight
+    # responses CORS answers on its own (D-041).
+    app.add_middleware(SecurityHeadersMiddleware, production=settings.environment == "production")
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(workspaces.router)
