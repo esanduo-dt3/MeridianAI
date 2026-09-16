@@ -38,9 +38,7 @@ claudeSkills/
 # Local reference material (never commit)
 alreadyDoneFullAgenticRag/
 
-# Golden set and its source documents. Both hold third-party document content,
-# so committing them is the owner's decision, not the default (backend/evals/README.md).
-backend/evals/golden.jsonl
-backend/evals/results/
+# Golden set test data: committed, except the owner's personal offer letter,
+# which stays in the eval workspace but never enters the repository.
+test data/DT3_Offer Letter_Esandu copy.docx
 golden-docs/
-test data/
