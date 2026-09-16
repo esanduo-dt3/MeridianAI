@@ -213,6 +213,8 @@ async def _full(
         "result": {
             "answer": outcome.answer,
             "answerable": outcome.answerable,
+            # Kept so the expected passage can be re-scored later without a new run.
+            "retrieved": [_chunk_brief(c, rank) for rank, c in enumerate(retrieval.best.chunks, start=1)],
             "citations": [
                 {
                     "ordinal": c.ordinal,
