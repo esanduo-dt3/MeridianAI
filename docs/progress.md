@@ -10,8 +10,8 @@ Newest first. Each entry states what exists, the verification recorded when that
 
 | Gate | Due | Status |
 | --- | --- | --- |
-| G1: 12 of 15 golden questions cite the correct chunk | End of Day 3 | Not yet run |
-| G2: propose, approve and write round trip | End of Day 4 | Not yet run |
+| G1: 12 of 15 golden questions cite the correct chunk | End of Day 3 | **Passed** 15/15 ([D-036](decisions.md#d-036), [D-038](decisions.md#d-038)); p50 latency 10.1 s misses the 8 s target |
+| G2: propose, approve and write round trip | End of Day 4 | **Passed** 2026-09-16 on the E2E workspace ([D-039](decisions.md#d-039)) |
 
 ## Day 2 (2026-09-16)
 

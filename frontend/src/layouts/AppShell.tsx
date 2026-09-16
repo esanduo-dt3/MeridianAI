@@ -9,6 +9,7 @@ import {
   ListMagnifyingGlass,
   NotePencil,
   Pulse,
+  Robot,
   SignOut,
   Tray,
   UsersThree,
@@ -32,6 +33,7 @@ interface NavItem {
 const workspaceNav: NavItem[] = [
   { to: '/tasks', label: 'Tasks', icon: CheckSquareOffset },
   { to: '/ask', label: 'Ask', icon: ChatTeardropText },
+  { to: '/assistant', label: 'Assistant', icon: Robot },
   { to: '/notes', label: 'Notes', icon: NotePencil },
   { to: '/documents', label: 'Documents', icon: Files },
   { to: '/members', label: 'Members', icon: UsersThree },

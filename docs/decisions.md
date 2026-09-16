@@ -45,6 +45,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-036](#d-036) | Golden set anchors on quotes, and the eval runs offline in two passes | Accepted | Engineering | 2026-09-16 |
 | [D-037](#d-037) | Persist the answering model, and record what the free Voyage tier costs retrieval | Accepted | Engineering | 2026-09-16 |
 | [D-038](#d-038) | Evaluation metrics beyond the gate, with intervals and objective key facts | Accepted | Engineering | 2026-09-16 |
+| [D-039](#d-039) | The workspace agent: LangChain tools, a JSON tool loop through the gateway, and proposals that need the user's own words | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -553,3 +554,22 @@ Each of these closes a gap the UI or the guardrails need.
 - **Consequences.**
   - On the first run: Recall@1 16/16 (95% CI 81-100%), citations 17/17, key facts complete 16/17 with U-02 missing `100,000`, **p50 latency 10.1 s against the 8 s target (fail)**, the flagging rule not exercised, and the red-team suite not run.
   - Recall@1, @3 and @5 are identical, so the current set is too easy to separate retrieval quality. Harder questions are needed before the metrics can show a regression.
+
+## D-039
+
+**The workspace agent: LangChain tools, a JSON tool loop through the gateway, and proposals that need the user's own words**
+
+- **Context.** Day 4 needs an agent that answers "what do I have to do" and can create tasks, without ever writing a task itself (non-negotiable 1), with plain LangChain rather than LangGraph ([D-028](#d-028)). The PRD also requires that only the user's own turns can trigger a write, proven rather than asserted.
+- **Decision.**
+  - **Tools** are `langchain_core` structured tools, bound per request to the person asking: `list_tasks` (mine, all or unassigned, by status), `get_task` (with subtasks), `list_members`, `search_workspace` (hybrid retrieval, passages wrapped as untrusted) and `propose_task`. Reads use the caller's own database client, so row-level security limits the agent to what that person can see.
+  - **The loop** asks the model for one JSON decision per step, a tool call or a reply, for at most six tool steps; the last step can only reply. Tool arguments are validated by the tool's schema, and invalid JSON, unknown tools, bad arguments and failing tools are reported back to the model instead of raised. The model is reached **through the existing gateway**, not a LangChain Gemini client, so the agent keeps the free-tier model chain, cooldowns and deadlines ([D-032](#d-032)). It uses the fast model: tool routing is simple, and the answer model's daily quota is the scarcer one.
+  - **`propose_task` writes a pending `agent_actions` row and an `agent_action.proposed` audit entry with `actor_type` agent,** never a task. Approval stays in the existing atomic `approve_agent_action` function.
+  - **Two structural guards on proposals:** the call must carry `user_request_quote`, which must be an excerpt of at least three words of the user's *current* message; and once any retrieved passage matches the injection scanner, proposals are refused for the rest of that turn. At most five proposals per message. Assignees must be workspace members; parent tasks must be in the workspace.
+  - `POST /agent/chat` is stateless: the client sends the recent conversation. Every turn is audit-logged as `agent.chat` with the tools used, their arguments, any proposal ids, whether injection was detected and the models that answered.
+  - The Assistant page shows what the agent did for each reply, proposals with a link to the Tasks page, and citations from document searches. It states that replies are not groundedness-checked and points to Ask for checked document answers.
+- **Why.** The quote rule turns "only the user can ask for a write" into something a unit test can check: text arriving through a tool is not in the user's message and cannot satisfy it. The taint rule covers the case where a poisoned passage and a genuine request arrive in the same turn.
+- **Consequences.**
+  - Verified live on the E2E workspace: "What do I have to do?" returned exactly the member's four open tasks, overdue first; a workspace-wide overdue question matched the database; a task request produced a proposal, and approving it through `approve_agent_action` created the task with `source` agent and a two-entry audit trail, proposed by the agent then approved by the Admin. **Gate G2 passes.**
+  - "Next Friday" on a Wednesday resolved to the Friday of the following week, not the same week. Reasonable, but worth knowing.
+  - Agent replies about documents are not groundedness-checked or confidence-scored; `/agent/ask` remains the checked path.
+  - The PRD's 8-document injection red-team suite still has to be run against this agent before Day 5.
