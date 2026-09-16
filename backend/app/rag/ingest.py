@@ -31,7 +31,7 @@ from app.core.config import get_settings
 from app.core.supabase import Db, open_service_db
 from app.llm.gateway import ModelError, QuotaExceeded, get_gateway
 from app.rag.chunker import Chunk, chunk_document
-from app.rag.parse import parse_file
+from app.rag.parse import UnsupportedDocument, check_file, parse_file
 
 log = logging.getLogger(__name__)
 
@@ -45,8 +45,14 @@ def _vector_literal(vector: list[float]) -> str:
 
 
 def _parse_and_chunk(doc_type: str, data: bytes, file_name: str) -> tuple[str, list[Chunk], dict[str, int], int]:
+    check_file(doc_type, data)
     parsed = parse_file(doc_type, data)
     text, chunks = chunk_document(parsed, source=file_name)
+    limit = get_settings().max_passages_per_document
+    if len(chunks) > limit:
+        raise UnsupportedDocument(
+            f"This document splits into {len(chunks)} passages; the limit is {limit}. Split it into smaller files."
+        )
     return text, chunks, parsed.stats, parsed.page_count
 
 
@@ -73,6 +79,8 @@ async def _process(db: Db, *, document_id: str, workspace_id: str, file_name: st
         await _clear_chunks(db, document_id)
         try:
             text, chunks, stats, pages = await to_thread.run_sync(_parse_and_chunk, doc_type, data, file_name)
+        except UnsupportedDocument as exc:
+            raise IngestFailure(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - malformed files raise many exception types
             log.warning("parsing failed for %s", document_id, exc_info=True)
             raise IngestFailure("The file couldn't be read. It may be damaged or password-protected.") from exc

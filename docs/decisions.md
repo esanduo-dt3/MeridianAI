@@ -47,6 +47,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-038](#d-038) | Evaluation metrics beyond the gate, with intervals and objective key facts | Accepted | Engineering | 2026-09-16 |
 | [D-039](#d-039) | The workspace agent: LangChain tools, a JSON tool loop through the gateway, and proposals that need the user's own words | Accepted | Engineering | 2026-09-16 |
 | [D-040](#d-040) | Admin surfaces: atomic review decisions, a paged audit log, and pipeline health from recorded rows only | Accepted | Engineering | 2026-09-16 |
+| [D-041](#d-041) | Deployment guardrails: rate limits, secret redaction, security headers, upload hardening | Accepted | Owner | 2026-09-17 |
 
 ---
 
@@ -590,3 +591,19 @@ Each of these closes a gap the UI or the guardrails need.
 - **Consequences.**
   - Verified: 11 new database access checks (85 total), 8 new API tests (110 total). Live on real data, the review queue and health figures matched known facts: Newbie Lab's 5 flagged answers are the 5 golden-set refusals, its 3 unreranked runs are the 3 `summarize` attempts, and its p50 latency is 10.1 s. A live dismissal left the queue, was audit-logged with the flag reasons, and a second decision on the same answer was refused with 409.
   - Answers recorded before migration `20260916160000_answer_model` show their model as "not recorded".
+
+## D-041
+
+**Deployment guardrails: rate limits, secret redaction, security headers, upload hardening**
+
+- **Context.** Before a public deployment, a review of the code found four gaps: no per-user rate limits on the endpoints that spend model quota; secrets redacted from Ask answers only, so a key pasted into the Assistant reached the model and the audit log; no security headers, and CORS accepting only a single origin; and uploads checked by file extension only, with no bound on how far a .docx expands when unzipped.
+- **Decision.** The owner chose to close all four before deployment.
+  1. **Rate limits.** A per-user sliding window on `/agent/ask` (6 a minute, 60 an hour), `/agent/chat` (10, 120) and document upload and reprocess (10, 60), refusing with 429 and `Retry-After`. Limits are per user, not per workspace, because the model quota they protect is shared. The window is held in the server process: it resets on restart and is not shared across processes, the same caveat as the embedding limiter ([D-033](#d-033)).
+  2. **Secret redaction in and out.** Questions, Assistant messages and the conversation history the browser sends back are redacted before they reach the model, the database or the audit log; Assistant replies are redacted on the way out. The audit entry records which kinds of secret were removed, never the values.
+  3. **Security headers and CORS.** Every response carries `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, a restrictive `Permissions-Policy` and `Cross-Origin-Opener-Policy`; API responses also carry `Content-Security-Policy: default-src 'none'` and `Cache-Control: no-store`; production adds HSTS. The middleware is outermost, so CORS preflights carry the headers too. `FRONTEND_ORIGIN` accepts a comma-separated list, and `*` is refused because the API is called with credentials. CORS methods are limited to those the API uses.
+  4. **Upload hardening.** Files are checked by their bytes, not their name: a PDF must carry `%PDF-` and stay within 1,500 pages; a .docx must be a real zip holding `word/document.xml`, with at most 5,000 entries and 200 MB once decompressed. A document that chunks into more than 3,000 passages fails ingestion with a reason. The checks run at upload, before anything is stored, and again at ingestion, so reprocessing and offline ingestion are covered.
+  - **Deferred: scanning documents for injection at upload.** The owner chose to run the red-team suite first, so its published score measures the defences that existed beforehand.
+- **Consequences.**
+  - Verified: 19 new tests (129 total), covering a zip bomb that compresses to a few kilobytes, a disguised file, a page cap, a passage cap, a pasted key that never reaches the model or the audit log, 429 with Retry-After, preflight headers and wildcard CORS refusal. Every real document on hand passes the upload checks, including the 6.8 MB PowerProx document, and a live server returned the headers and still refused unauthenticated requests with 401.
+  - The frontend host must set its own security headers at deployment; these cover the API only.
+  - Limits are conservative for the free Gemini tier and are settings, so they can be raised with a paid key.
