@@ -2,7 +2,8 @@
 
 Uploads run with the caller's token, so the bucket's policies (Admins upload to
 their own workspace's folder) apply on top of the API's role check. Background
-processing reads and cleans up with the service role.
+processing reads and cleans up with the service role, and so does offline
+ingestion that has no caller to act for (``user_token=None``).
 """
 
 from __future__ import annotations
@@ -39,12 +40,13 @@ def _object_url(path: str) -> str:
     return f"{get_settings().supabase_storage_url}/object/{BUCKET}/{quote(path)}"
 
 
-async def upload(path: str, data: bytes, content_type: str, *, user_token: str) -> None:
+async def upload(path: str, data: bytes, content_type: str, *, user_token: str | None) -> None:
+    headers = _headers(user_token) if user_token else _service_headers()
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             _object_url(path),
             content=data,
-            headers={**_headers(user_token), "Content-Type": content_type, "x-upsert": "false"},
+            headers={**headers, "Content-Type": content_type, "x-upsert": "false"},
         )
     if response.status_code in (401, 403):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You can't upload to this workspace")

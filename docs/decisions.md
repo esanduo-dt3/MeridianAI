@@ -42,6 +42,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-033](#d-033) | Pace document embedding under the free-tier quota | Accepted | Engineering | 2026-09-16 |
 | [D-034](#d-034) | Preview passages before embedding finishes | Accepted | Owner | 2026-09-16 |
 | [D-035](#d-035) | The Ask page shows the whole reliability record of an answer | Accepted | Engineering | 2026-09-16 |
+| [D-036](#d-036) | Golden set anchors on quotes, and the eval runs offline in two passes | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -500,3 +501,21 @@ Each of these closes a gap the UI or the guardrails need.
   - `AskPage` moves out of `routes/surfaces.tsx` into `routes/AskPage.tsx`; `surfaces.tsx` now holds only the admin placeholders.
   - The review queue and audit views can reuse `AnswerSignals` and `AnswerText`, so a flagged answer reads the same in both places.
   - The Ask page does not yet filter by document, although `POST /agent/ask` accepts `document_ids`.
+
+## D-036
+
+**Golden set anchors on quotes, and the eval runs offline in two passes**
+
+- **Context.** Gate G1 needs 15 owner-written questions run against the pipeline, with the correct-citation rate reported. The free Gemini tier allows roughly 20 requests a day per model ([D-032](#d-032)), and one question costs two to four generation calls, so a full run is close to a day's quota and can only be done once.
+- **Decision.**
+  - **A question names its expected passage by a verbatim quote, never a chunk id.** Chunk ids are regenerated on every reprocess ([D-034](#d-034)), so a set keyed on them would break the first time the corpus is re-ingested. `evals.validate` resolves each quote against the stored document text at run time, folding whitespace, case and curly punctuation so a pasted quote still matches, then maps the match back to real character offsets and finds the passages containing it. A quote that is missing, or that straddles a passage boundary and sits inside no single passage, fails the dataset before any model call.
+  - **Two passes.** `--retrieval-only` embeds, searches and reranks with **no generation calls at all**, answering whether the expected passage was retrieved and at what rank. The full run is the measured one. A passage that is never retrieved cannot be cited, so retrieval is fixed for free before generation quota is spent.
+  - **G1 is scored over answerable questions only.** An unanswerable question has no correct passage, so refusal questions are a separate set with their own metric. Over-refusal on the answerable set is reported too, because a refusal-only metric hides it.
+  - **The harness runs offline with the service role**, calling `agentic_retrieve`, `generate_answer` and `record_answer` directly. No browser sign-in, and no `meridian-e2e-*` accounts to clean up afterwards. Rows still land in `retrieval_runs`, `agent_answers` and `answer_citations`, so Pipeline Health later reads real data.
+  - **The machine scores what is mechanical; a person scores the prose.** Each result carries a `grading` block (`answer_correct`, `citation_acceptable`, `notes`) left null by the runner. `citation_acceptable` is an override in both directions: the model sometimes cites a different passage that genuinely supports the answer, and scoring against one expected quote would call that wrong. The report shows the auto figure and the override count separately, so the adjustment is visible.
+  - **Ingestion is sequential and resumable.** A document already ready is skipped, so a run stopped by the daily embedding quota resumes the next day, and `ready` is only accepted when every passage is embedded.
+  - `golden.jsonl` and `golden-docs/` are git-ignored, because their quotes are verbatim extracts from documents that may not be the owner's to commit.
+- **Consequences.**
+  - `storage.upload` accepts `user_token=None` and uses the service role, for ingestion with no caller to act for.
+  - The report warns when any gate question was answered by a fallback model, and names the run unfair per [D-031](#d-031) rather than reporting the number quietly.
+  - The harness does not write the questions. Per `docs/product/overview.md`, the golden set is authored by a person independently of the model under test.

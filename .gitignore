@@ -37,3 +37,8 @@ claudeSkills/
 
 # Local reference material (never commit)
 alreadyDoneFullAgenticRag/
+
+# Golden set and its source documents. Both hold third-party document content,
+# so committing them is the owner's decision, not the default (backend/evals/README.md).
+backend/evals/golden.jsonl
+golden-docs/
