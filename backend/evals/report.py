@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from evals._cli import fail, say
+from evals.golden import GoldenError, load
+from evals.metrics import compute
 
 GATE_REQUIRED = 12
 GATE_TOTAL = 15
@@ -27,6 +29,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Report Gate G1 results from a run.")
     parser.add_argument("--results", required=True, type=Path)
     parser.add_argument("--no-markdown", action="store_true", help="print metrics only")
+    parser.add_argument("--golden", type=Path, default=Path(__file__).parent / "golden.jsonl",
+                        help="golden set, for its must_include key facts")
     args = parser.parse_args()
 
     if not args.results.exists():
@@ -43,7 +47,79 @@ def main() -> int:
         say()
 
     _print_metrics(run, records, mode)
+
+    must_include: dict[str, list[str]] = {}
+    if args.golden.exists():
+        try:
+            must_include = {q.id: q.must_include for q in load(args.golden) if q.must_include}
+        except GoldenError as exc:
+            say(f"(golden set unreadable, key facts skipped: {exc})")
+    metrics = compute(run, records, must_include)
+    _print_extended(metrics)
+    sidecar = args.results.with_suffix(".metrics.json")
+    sidecar.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+    say()
+    say(f"Wrote {sidecar}")
     return 0
+
+
+def _pct_ci(entry: dict | None) -> str:
+    if not entry or not entry.get("n"):
+        return "n/a"
+    low, high = entry["ci95"]
+    return f"{entry['hits']}/{entry['n']}  ({100 * entry['rate']:.0f}%, 95% CI {100 * low:.0f}-{100 * high:.0f}%)"
+
+
+def _print_extended(m: dict) -> None:
+    say()
+    say("=" * 64)
+    say("Extended metrics")
+    say("=" * 64)
+    r = m["retrieval"]
+    say("Retrieval (rank of the expected passage after rerank and MMR)")
+    for k in (1, 3, 5):
+        say(f"  Recall@{k:<22} {_pct_ci(r[f'recall_at_{k}'])}")
+    say(f"  Retrieved at any rank        {_pct_ci(r['recall_any'])}")
+    if r.get("rank_unknown"):
+        say(f"  Rank unknown, excluded above {r['rank_unknown']}")
+    if "citations" not in m:
+        return
+    c = m["citations"]
+    say()
+    say("Citations")
+    say(f"  Correct passage cited        {_pct_ci(c['correct_passage_cited'])}")
+    say(f"  Strict citation precision    {c['strict_precision_mean']}  (extra valid passages count against it)")
+    say(f"  Citations per answer         {c['mean_citations_per_answer']}")
+    kf = m["key_facts"]
+    say()
+    say("Key facts (objective completeness, no model, no grader)")
+    if kf["questions_with_facts"]:
+        say(f"  Every key fact present       {_pct_ci(kf['fully_covered'])}")
+        say(f"  Mean coverage                {kf['mean_coverage']}")
+        for qid, missing in kf["incomplete"].items():
+            say(f"  {qid} missing                {missing}")
+    else:
+        say("  No must_include facts in the golden set.")
+    h = m["human_grading"]
+    say()
+    say(f"Human grading  graded {h['graded']}, ungraded {h['ungraded']}  "
+        f"(correct {h['correct']}, partial {h['partial']}, incorrect {h['incorrect']})")
+    conf = m["confidence"]
+    say(f"Confidence     right {conf['mean_when_right']} (n={conf['n_right']}), "
+        f"wrong {conf['mean_when_wrong']} (n={conf['n_wrong']}), missing {conf['missing_confidence']}")
+    if not conf["can_validate_threshold"]:
+        say("               No wrong answers with a confidence value, so the review threshold cannot be validated.")
+    say()
+    say("By question type        n   cited  rank-1  facts complete")
+    for kind, v in sorted(m["by_kind"].items()):
+        facts = f"{v['facts_complete']}/{v['facts_n']}" if v["facts_n"] else "-"
+        say(f"  {kind:<20} {v['n']:>3} {v['cited']:>6} {v['rank_1']:>7}  {facts:>14}")
+    say(f"Profiles used  {m['profiles_used']}")
+    say()
+    say("PRD evaluation targets")
+    for t in m["prd_targets"]:
+        say(f"  [{t['status'].upper():^14}] {t['target']}")
+        say(f"  {'':16} actual: {t['actual']}")
 
 
 # --- Metrics ---------------------------------------------------------------

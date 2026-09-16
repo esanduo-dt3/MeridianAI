@@ -33,6 +33,7 @@ class GoldenQuestion:
     expected_answer: str
     answerable: bool
     notes: str
+    must_include: list[str] = field(default_factory=list)
 
     @property
     def scored_for_gate(self) -> bool:
@@ -107,6 +108,7 @@ def _one(raw: dict, path: Path, number: int) -> GoldenQuestion:
         expected_answer=str(raw.get("expected_answer", "")).strip(),
         answerable=answerable,
         notes=str(raw.get("notes", "")).strip(),
+        must_include=[f.strip() for f in raw.get("must_include", []) if isinstance(f, str) and f.strip()],
     )
 
 

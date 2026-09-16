@@ -44,6 +44,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-035](#d-035) | The Ask page shows the whole reliability record of an answer | Accepted | Engineering | 2026-09-16 |
 | [D-036](#d-036) | Golden set anchors on quotes, and the eval runs offline in two passes | Accepted | Engineering | 2026-09-16 |
 | [D-037](#d-037) | Persist the answering model, and record what the free Voyage tier costs retrieval | Accepted | Engineering | 2026-09-16 |
+| [D-038](#d-038) | Evaluation metrics beyond the gate, with intervals and objective key facts | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -536,3 +537,19 @@ Each of these closes a gap the UI or the guardrails need.
   - The review queue and pipeline health view can group answers by model, so a fallback-heavy period is visible rather than inferred.
   - **On the current Voyage key the `summarize` profile is unmeasurable**, and `explore` is unreliable under any concurrency. Only `lookup` reranks dependably. Gate G1 results should say which profiles were used.
   - In the product, four questions in a minute silently degrade the fourth: unreranked results, no confidence value, and an extra model call, with no error shown to the user.
+
+## D-038
+
+**Evaluation metrics beyond the gate, with intervals and objective key facts**
+
+- **Context.** The first G1 report gave a pass rate and little else. Three problems showed up while checking it: a perfect score on 15 questions said nothing about uncertainty; completeness depended entirely on a person grading (U-02 omitted the salary figure and nothing automatic noticed); and a rank recorded before an expected passage was corrected showed up as a retrieval miss.
+- **Decision.**
+  - A pure `evals.metrics` module computes, from existing runs only: Recall@1/3/5, MRR, correct-citation rate, strict citation precision, key-fact coverage, groundedness, correct and false refusals, human-grade counts, latency p50/p95, model mix, runs without rerank, confidence when right versus wrong, a breakdown by question type, and a PRD target table.
+  - Every rate carries a 95% Wilson interval.
+  - Golden questions may carry `must_include` key facts, matched as whole tokens with case, hyphens and curly quotes folded. `evals.validate` rejects a fact absent from the source document.
+  - A PRD rule that the run never exercised is reported as **not exercised**, not as a pass. A rank that cannot be recomputed is excluded from Recall@k and named, not counted as a miss.
+  - Full runs now keep the retrieved list, so a later correction to an expected passage can be re-scored without a new run.
+  - The report writes `<results>.metrics.json`, and results files only ever gain fields, so an external reviewer page keeps working.
+- **Consequences.**
+  - On the first run: Recall@1 16/16 (95% CI 81-100%), citations 17/17, key facts complete 16/17 with U-02 missing `100,000`, **p50 latency 10.1 s against the 8 s target (fail)**, the flagging rule not exercised, and the red-team suite not run.
+  - Recall@1, @3 and @5 are identical, so the current set is too easy to separate retrieval quality. Harder questions are needed before the metrics can show a regression.

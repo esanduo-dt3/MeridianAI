@@ -78,3 +78,36 @@ Two things decide whether a run is worth reporting at all:
   `--only G-03,G-07` once quota resets.
 - **Cache.** The gateway keeps an in-process response cache, so **restart the backend before a
   measured run** or repeated questions return cached answers with fabricated latency.
+
+## Metrics
+
+`evals.report` prints the metrics and writes `<results>.metrics.json` beside the results file, for
+any UI that wants them. Every metric is computed from an existing run, so adding one costs no quota.
+
+| Group | Metric | What it tells you |
+| --- | --- | --- |
+| Retrieval | Recall@1, @3, @5 | Was the expected passage in the top k after rerank and MMR |
+| Retrieval | Retrieved at any rank, MRR | Whether and how high the passage surfaced at all |
+| Citations | Correct passage cited | **Gate G1** |
+| Citations | Strict citation precision | Share of cited passages that were expected; extra valid sources count against it |
+| Key facts | Every key fact present | Objective completeness from `must_include`, no model and no grader |
+| Answer quality | Groundedness passed, correct refusals, false refusals | The guardrails behaving |
+| Human grading | Correct / partial / incorrect | Whether the prose is right |
+| Operational | Latency p50/p95, model mix, fallbacks, runs without rerank | Whether the run is a fair measurement |
+| Confidence | Mean when right vs wrong | Whether the uncalibrated value separates good answers from bad |
+| PRD targets | G1, p50 latency, flagging rule, hand labelling, red team | Pass, fail, partial, not exercised or not run |
+
+Rates carry a 95% Wilson interval. At 15 questions, 15/15 has an interval of roughly 80-100%, so
+read the interval, not the point.
+
+**Key facts.** Add `"must_include": ["62", "5"]` to a question: short tokens a complete answer
+must contain. They match as whole tokens, so `5` does not match inside `15`, and they fold case,
+hyphens and curly quotes. `evals.validate` refuses a fact that is not in the source document, since
+no model could ever supply it.
+
+**When to run what.**
+
+- After any change to chunking, retrieval or reranking: `evals.run --retrieval-only` and the report.
+  No generation calls.
+- Before a gate or a demo: the full run, then grading, then the report.
+- Before Day 5: the injection red-team suite (PRD section 5), which this harness does not yet run.

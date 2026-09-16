@@ -17,6 +17,7 @@ from app.core.supabase import open_service_db
 from evals import corpus as corpus_mod
 from evals._cli import fail, resolve_workspace, say
 from evals.golden import GoldenError, load
+from evals.metrics import fact_present
 
 DEFAULT_GOLDEN = Path(__file__).parent / "golden.jsonl"
 
@@ -57,6 +58,14 @@ async def main() -> int:
             where = resolved.document.file_name if resolved.document else "corpus"
             passages = ", ".join(str(i) for i in resolved.expected_chunk_indexes)
             say(f"  {question.id}  -> {where} passage {passages}")
+            # A key fact the source document does not contain can never be answered,
+            # so it is a dataset error, not a model failure.
+            source = resolved.document.content_text if resolved.document else " ".join(
+                d.content_text for d in corpus.ready)
+            absent = [f for f in question.must_include if not fact_present(source, f)]
+            if absent:
+                problems += 1
+                say(f"  {question.id}  PROBLEM: must_include not in {where}: {absent}")
         else:
             problems += 1
             say(f"  {question.id}  PROBLEM: {resolved.problem}")

@@ -186,3 +186,66 @@ def test_an_alternate_quote_is_found_in_another_document(tmp_path):
     resolved = corpus_mod.resolve(corpus, question)
     assert resolved.ok
     assert set(resolved.expected_chunk_ids) == {"c1", "c3"}
+
+
+# --- Extended metrics ------------------------------------------------------
+
+from evals import metrics  # noqa: E402
+
+
+def test_wilson_interval_is_wide_for_a_small_sample():
+    low, high = metrics.wilson(15, 15)
+    assert high == 1.0
+    assert low < 0.85  # 15/15 does not mean "certainly 100%"
+
+
+def test_a_key_fact_must_match_as_a_whole_token():
+    assert metrics.fact_present("It has 5 workstations.", "5")
+    assert not metrics.fact_present("It has 15 workstations.", "5")
+    assert not metrics.fact_present("Firmware 11.8 is current.", "1.8")
+
+
+def test_key_facts_fold_hyphens_case_and_curly_quotes():
+    assert metrics.fact_present("It buffers a 96 hour design capacity", "96-hour")
+    assert metrics.fact_present("POWER-CYCLE the gateway", "power-cycle")
+    assert metrics.fact_present("DT3 gives 2 weeks’ notice", "2 weeks")
+
+
+def test_missing_key_facts_are_named():
+    coverage = metrics.key_fact_coverage("Paid on the 7th via timecard.", ["7th", "timecard", "100,000"])
+    assert coverage["missing"] == ["100,000"]
+    assert coverage["present"] == 2
+
+
+def _full_record(qid, *, rank=1, cited=True, grounded=True, flagged=False, unknown=False):
+    score = {"expected_chunk_cited": cited, "rank_of_expected": rank, "expected_chunk_retrieved": rank is not None or unknown}
+    if unknown:
+        score.update(rank_unknown=True, rank_of_expected=None)
+    return {
+        "id": qid, "kind": "single_passage", "profile": "lookup", "answerable_expected": True,
+        "expected": {"chunk_ids": ["e"]},
+        "result": {"answer": "x", "citations": [{"chunk_id": "e"}], "grounded": grounded, "flagged": flagged,
+                   "confidence": 0.9, "latency_ms": 1000, "model": "m", "attempts": 1, "reranked": True},
+        "auto_score": score,
+        "grading": {"answer_correct": None, "citation_acceptable": None},
+    }
+
+
+def test_an_unknown_rank_is_excluded_from_recall_not_counted_as_a_miss():
+    records = [_full_record("G-01"), _full_record("U-01", unknown=True)]
+    m = metrics.compute({"mode": "full"}, records)
+    assert m["retrieval"]["recall_at_1"]["n"] == 1
+    assert m["retrieval"]["recall_at_1"]["hits"] == 1
+    assert m["retrieval"]["rank_unknown"] == ["U-01"]
+
+
+def test_the_flagging_rule_is_not_exercised_when_nothing_was_ungrounded():
+    m = metrics.compute({"mode": "full"}, [_full_record("G-01")])
+    rule = next(t for t in m["prd_targets"] if "ungrounded" in t["target"])
+    assert rule["status"] == "not exercised"
+
+
+def test_an_ungrounded_answer_that_was_not_flagged_fails_the_rule():
+    m = metrics.compute({"mode": "full"}, [_full_record("G-01", grounded=False, flagged=False)])
+    rule = next(t for t in m["prd_targets"] if "ungrounded" in t["target"])
+    assert rule["status"] == "fail"
