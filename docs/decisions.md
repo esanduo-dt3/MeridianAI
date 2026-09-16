@@ -46,6 +46,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-037](#d-037) | Persist the answering model, and record what the free Voyage tier costs retrieval | Accepted | Engineering | 2026-09-16 |
 | [D-038](#d-038) | Evaluation metrics beyond the gate, with intervals and objective key facts | Accepted | Engineering | 2026-09-16 |
 | [D-039](#d-039) | The workspace agent: LangChain tools, a JSON tool loop through the gateway, and proposals that need the user's own words | Accepted | Engineering | 2026-09-16 |
+| [D-040](#d-040) | Admin surfaces: atomic review decisions, a paged audit log, and pipeline health from recorded rows only | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -573,3 +574,19 @@ Each of these closes a gap the UI or the guardrails need.
   - "Next Friday" on a Wednesday resolved to the Friday of the following week, not the same week. Reasonable, but worth knowing.
   - Agent replies about documents are not groundedness-checked or confidence-scored; `/agent/ask` remains the checked path.
   - The PRD's 8-document injection red-team suite still has to be run against this agent before Day 5.
+
+## D-040
+
+**Admin surfaces: atomic review decisions, a paged audit log, and pipeline health from recorded rows only**
+
+- **Context.** Day 5 replaces the three Admin placeholders: the review queue, the audit log and pipeline health. The PRD requires a decision recorded for every flagged item, an attributable audit trail, and health figures "backed by real retrieval_runs data".
+- **Decision.**
+  - **Review queue** (`GET /admin/review`) lists flagged answers that have no decision yet, with their citations, and pending agent proposals, plus the 20 most recent decisions of either kind.
+  - An Admin **confirms, corrects or dismisses** a flagged answer (`POST /admin/review/answers/{id}`). Migration `20260916180000_answer_reviews` adds `review_agent_answer`, which, like `approve_agent_action` ([D-009](#d-009)), re-checks that the reviewer is an Admin of the answer's own workspace and writes the `admin_reviews` row and an `answer.reviewed` audit entry in one transaction. A correction must carry the corrected answer, which is stored in the new `admin_reviews.correction` column for later retrieval tuning. A unique index allows one decision per item.
+  - Agent proposals keep their existing approve and reject path. Their decision already lives on `agent_actions` with its own audit entry, so it is not duplicated into `admin_reviews`.
+  - **Audit log** (`GET /admin/audit`) filters by actor type and an action substring, pages backwards by timestamp, and shows each entry's details.
+  - **Pipeline health** (`GET /admin/pipeline-health?days=`) is a pure calculation over `retrieval_runs` and `agent_answers` rows in the window. Every rate is returned as hits over n, and a window with no rows gives null, not zero. The page labels **"retrieval graded good" as the pipeline's own grade, not a hit rate**: live traffic has no ground truth, so the measured hit rate stays Gate G1's Recall@k. It also reports how often reranking was unavailable (D-037), latency against the 8-second target, flag reasons, models and profiles, and a per-day table.
+  - Every endpoint requires an Admin, and reads run under the Admin's own row-level security.
+- **Consequences.**
+  - Verified: 11 new database access checks (85 total), 8 new API tests (110 total). Live on real data, the review queue and health figures matched known facts: Newbie Lab's 5 flagged answers are the 5 golden-set refusals, its 3 unreranked runs are the 3 `summarize` attempts, and its p50 latency is 10.1 s. A live dismissal left the queue, was audit-logged with the flag reasons, and a second decision on the same answer was refused with 409.
+  - Answers recorded before migration `20260916160000_answer_model` show their model as "not recorded".

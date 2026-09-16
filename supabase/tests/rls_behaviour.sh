@@ -155,6 +155,21 @@ check "attach ignores chunks of another document" service "=0" "select public.at
 check "the document is marked ready" service "=ready" "update public.documents set parsed_status = 'ready', processing_stage = null where id = '$D2' returning parsed_status"
 check "the document is searchable once ready" "$E" "=2" "select count(*) from public.match_chunks_sparse('$W', 'rectifier')"
 
+echo "Review decisions on flagged answers"
+ANS="$(value_as service "insert into public.agent_answers (workspace_id, asked_by, question, answer, confidence, groundedness_pass, flagged, flag_reasons) values ('$W', '$E', 'How often are rectifiers serviced?', 'Every year [1].', 0.21, false, true, '{low_confidence,groundedness_failed}') returning id")"
+ANS2="$(value_as service "insert into public.agent_answers (workspace_id, asked_by, question, answer, confidence, groundedness_pass, flagged) values ('$W', '$E', 'Second', 'Answer', 0.2, true, true) returning id")"
+check "users cannot call review directly" "$B" fail "select public.review_agent_answer('$ANS', '$B', 'confirmed')"
+check "review refuses a non-admin reviewer" service fail "select public.review_agent_answer('$ANS', '$E', 'confirmed')"
+check "review refuses an admin of another workspace" service fail "select public.review_agent_answer('$ANS', '$C', 'confirmed')"
+check "a correction needs the corrected answer" service fail "select public.review_agent_answer('$ANS', '$B', 'corrected', 'wrong interval')"
+check "admin corrects a flagged answer" service "=corrected|Every six months." "select decision || '|' || correction from public.review_agent_answer('$ANS', '$B', 'corrected', 'wrong interval', 'Every six months.')"
+check "the review is audit-logged with the flag reasons" service "=t" "select exists (select 1 from public.audit_log where action = 'answer.reviewed' and target_id = '$ANS' and details -> 'flag_reasons' ? 'groundedness_failed')"
+check "an answer cannot be reviewed twice" service fail "select public.review_agent_answer('$ANS', '$B', 'dismissed')"
+check "dismissal stores no correction" service "=dismissed|true" "select decision || '|' || (correction is null) from public.review_agent_answer('$ANS2', '$B', 'dismissed', null, 'ignored text')"
+check "admins read review decisions" "$B" "=2" "select count(*) from public.admin_reviews where workspace_id = '$W'"
+check "members cannot read review decisions" "$E" "=0" "select count(*) from public.admin_reviews"
+check "members cannot write review decisions" "$E" fail "insert into public.admin_reviews (workspace_id, review_target_type, review_target_id, reviewer_id, decision) values ('$W', 'agent_answer', '$ANS', '$E', 'confirmed')"
+
 echo
 echo "$PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]
