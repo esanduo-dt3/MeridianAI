@@ -1,53 +1,16 @@
 /*
-  Workspace surfaces for the PRD's MUST scope. Each one is an honest empty
+  The admin surfaces that are still to be built. Each one is an honest empty
   state: no sample rows, no placeholder metrics, no simulated answers. They are
   replaced by real features as the backend for each lands.
 */
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  ArrowRight,
-  ChatTeardropText,
-  ListMagnifyingGlass,
-  Pulse,
-  Tray,
-} from '@phosphor-icons/react'
+import { ListMagnifyingGlass, Pulse, Tray } from '@phosphor-icons/react'
 import { EmptyState } from '../components/EmptyState'
 import { PageHeader } from '../components/PageHeader'
-import { ReliabilityNote } from '../components/ReliabilityNote'
 import { AdminOnly } from '../workspace/AdminOnly'
 
 function Page({ children }: { children: ReactNode }) {
   return <div className="flex flex-col gap-8">{children}</div>
-}
-
-const linkAction =
-  'inline-flex min-h-11 items-center gap-2 rounded-(--radius-control) border border-rule-strong bg-surface px-4 text-[15px] font-medium text-ink transition-colors hover:border-ink-3 hover:bg-paper'
-
-export function AskPage() {
-  return (
-    <Page>
-      <PageHeader
-        title="Ask"
-        status="not-built"
-        description="Ask a question about this workspace. Every answer links to the passages it used."
-      />
-      <EmptyState
-        icon={ChatTeardropText}
-        title="Nothing to answer from yet"
-        action={
-          <Link to="/documents" className={linkAction}>
-            Go to documents
-            <ArrowRight aria-hidden size={16} weight="bold" />
-          </Link>
-        }
-      >
-        Meridian only answers from documents and notes in this workspace. Once a document is uploaded and processed, you
-        can ask about it here.
-      </EmptyState>
-      <ReliabilityNote />
-    </Page>
-  )
 }
 
 export function ReviewQueuePage() {
