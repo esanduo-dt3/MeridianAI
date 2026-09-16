@@ -156,6 +156,10 @@ class AnswerListItem(BaseModel):
     flagged: bool
     flag_reasons: list[str]
     created_at: str
+    # Which model answered. Null for answers recorded before the column existed
+    # (migration 20260916160000_answer_model); a fallback here means the answer
+    # did not come from the configured answer model (D-031).
+    model: str | None = None
 
 
 @router.get("/agent/answers", response_model=list[AnswerListItem])
@@ -163,7 +167,7 @@ async def recent_answers(context: WorkspaceContext = Depends(get_workspace_conte
     rows = await db.select(
         "agent_answers",
         {
-            "select": "id,question,answer,confidence,groundedness_pass,flagged,flag_reasons,created_at",
+            "select": "id,question,answer,confidence,groundedness_pass,flagged,flag_reasons,created_at,model",
             "workspace_id": f"eq.{context.workspace_id}",
             "asked_by": f"eq.{context.user_id}",
             "order": "created_at.desc",

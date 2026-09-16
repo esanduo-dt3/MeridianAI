@@ -43,6 +43,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-034](#d-034) | Preview passages before embedding finishes | Accepted | Owner | 2026-09-16 |
 | [D-035](#d-035) | The Ask page shows the whole reliability record of an answer | Accepted | Engineering | 2026-09-16 |
 | [D-036](#d-036) | Golden set anchors on quotes, and the eval runs offline in two passes | Accepted | Engineering | 2026-09-16 |
+| [D-037](#d-037) | Persist the answering model, and record what the free Voyage tier costs retrieval | Accepted | Engineering | 2026-09-16 |
 
 ---
 
@@ -519,3 +520,19 @@ Each of these closes a gap the UI or the guardrails need.
   - `storage.upload` accepts `user_token=None` and uses the service role, for ingestion with no caller to act for.
   - The report warns when any gate question was answered by a fallback model, and names the run unfair per [D-031](#d-031) rather than reporting the number quietly.
   - The harness does not write the questions. Per `docs/product/overview.md`, the golden set is authored by a person independently of the model under test.
+
+## D-037
+
+**Persist the answering model, and record what the free Voyage tier costs retrieval**
+
+- **Context.** The first real Gate G1 run exposed two gaps between the decision log and the code.
+  - [D-031](#d-031) and [D-032](#d-032) both state that `agent_answers.model` records the model that answered, and D-032 requires golden-set runs to report it. **The column was never created.** Eight of twenty answers in the run came from a fallback model, and none of that was visible in the database.
+  - The Voyage reranker's free tier, with no payment method on the key, allows 3 requests a minute **and 10,000 tokens a minute**. A `lookup` request reranks 20 passages and fits. `explore` (40) and `summarize` (45) do not, so a single `summarize` question cannot rerank at all, even with no other traffic.
+- **Decision.**
+  - Migration `20260916160000_answer_model` adds `agent_answers.model`, and `record_answer` writes `outcome.model`. Rows written earlier keep a null model, which is honest: that value was never recorded and cannot be recovered. `GET /agent/answers` returns it and the Ask page shows it beside the confidence value.
+  - The eval runner gains `--pace`, and **marks any run that lost reranking as not a valid measurement**. Without a rerank score the retrieval grade falls back to a model call ([D-030](#d-030)) and the confidence value is null ([D-027](#d-027)), so such a run measures a different, degraded pipeline.
+  - The free-tier rerank limit is recorded as a **known constraint, not fixed here**. Pacing the product would add waits to a person's question; paying for the key would not. That is the owner's call.
+- **Consequences.**
+  - The review queue and pipeline health view can group answers by model, so a fallback-heavy period is visible rather than inferred.
+  - **On the current Voyage key the `summarize` profile is unmeasurable**, and `explore` is unreliable under any concurrency. Only `lookup` reranks dependably. Gate G1 results should say which profiles were used.
+  - In the product, four questions in a minute silently degrade the fourth: unreranked results, no confidence value, and an extra model call, with no error shown to the user.

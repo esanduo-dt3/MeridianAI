@@ -231,4 +231,6 @@ export interface AnswerListItem {
   flagged: boolean
   flag_reasons: string[]
   created_at: string
+  /** Null for answers recorded before the model column existed (D-031). */
+  model: string | null
 }
