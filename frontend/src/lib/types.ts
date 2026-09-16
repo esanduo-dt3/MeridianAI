@@ -113,9 +113,12 @@ export interface DocumentSummary {
   mime_type: string
   size_bytes: number
   parsed_status: ParsedStatus
+  /** While processing: reading the file, then embedding its saved passages. */
+  processing_stage: 'parsing' | 'embedding' | null
   parse_error: string | null
   page_count: number | null
   chunk_count: number
+  embedded_count: number
   parse_stats: Record<string, number>
   created_at: string
   processed_at: string | null
@@ -132,6 +135,8 @@ export interface ChunkInfo {
   section: string
   kind: 'text' | 'table' | 'code'
   token_count: number
+  /** False while the document is still embedding; the passage is not searchable yet. */
+  embedded: boolean
 }
 
 export interface DocumentDetail extends DocumentSummary {

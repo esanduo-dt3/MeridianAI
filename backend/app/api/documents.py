@@ -39,9 +39,11 @@ class DocumentSummary(BaseModel):
     mime_type: str
     size_bytes: int
     parsed_status: ParsedStatus
+    processing_stage: Literal["parsing", "embedding"] | None = None
     parse_error: str | None
     page_count: int | None
     chunk_count: int
+    embedded_count: int = 0
     parse_stats: dict
     created_at: str
     processed_at: str | None
@@ -57,6 +59,7 @@ class ChunkInfo(BaseModel):
     section: str
     kind: str
     token_count: int
+    embedded: bool  # False while the document is still embedding
 
 
 class DocumentDetail(DocumentSummary):
@@ -65,7 +68,8 @@ class DocumentDetail(DocumentSummary):
 
 
 _SUMMARY_SELECT = (
-    "id,file_name,doc_type,mime_type,size_bytes,parsed_status,parse_error,page_count,chunk_count,parse_stats,"
+    "id,file_name,doc_type,mime_type,size_bytes,parsed_status,processing_stage,parse_error,page_count,chunk_count,"
+    "embedded_count,parse_stats,"
     "created_at,processed_at,uploaded_by:users!documents_uploaded_by_fkey(id,email,full_name)"
 )
 
@@ -89,12 +93,13 @@ async def get_document(document_id: str, context: WorkspaceContext = Depends(get
     chunks = await db.select(
         "chunks",
         {
-            "select": "id,chunk_index,char_start,char_end,page,section,kind,token_count",
+            "select": "id,chunk_index,char_start,char_end,page,section,kind,token_count,embedding_ref",
             "document_id": f"eq.{document_id}",
             "order": "chunk_index.asc",
         },
     )
-    return DocumentDetail(**rows[0], chunks=[ChunkInfo(**c) for c in chunks])
+    infos = [ChunkInfo(**{k: v for k, v in c.items() if k != "embedding_ref"}, embedded=c["embedding_ref"] is not None) for c in chunks]
+    return DocumentDetail(**rows[0], chunks=infos)
 
 
 @router.post("/documents/upload", response_model=DocumentSummary, status_code=status.HTTP_202_ACCEPTED)
