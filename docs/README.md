@@ -14,6 +14,7 @@ Meridian is an AI-native workspace where every AI answer cites the exact passage
 | Look up an endpoint | [architecture/api.md](architecture/api.md) |
 | Change the database | [guides/database.md](guides/database.md) |
 | Contribute a change | [guides/contributing.md](guides/contributing.md) |
+| Deploy to Railway | [guides/deployment.md](guides/deployment.md) |
 | Build UI that fits | [design/design-system.md](design/design-system.md) |
 | See why something differs from the PRD | [decisions.md](decisions.md) |
 | See what is done and what is next | [progress.md](progress.md) |
