@@ -1,0 +1,93 @@
+# API reference
+
+- **Base URL (local):** `http://localhost:8000`. Interactive docs are at `/docs` everywhere except production.
+- **Authentication:** `Authorization: Bearer <Supabase access token>`.
+- **Workspace scope:** workspace-scoped routes take `X-Workspace-Id: <uuid>`. The caller must be a member of that workspace.
+
+## Errors
+
+Errors return `{"detail": "<message>"}`.
+
+| Status | Meaning |
+| --- | --- |
+| 401 | Missing, malformed, expired or wrongly signed token |
+| 400 | A workspace-scoped route was called without `X-Workspace-Id` |
+| 403 | Not a member of the workspace, or the role does not allow the action |
+| 404 | The member, invite or task does not exist in this workspace |
+| 409 | Conflicts with current state: already a member, already invited, or the last Admin |
+| 422 | Invalid input, such as a bad email, blank name or malformed id |
+| 503 | A dependency (the workspace lookup) is unavailable. Never answered with unscoped data |
+
+## Implemented
+
+| Method and path | Scope | Role | Returns |
+| --- | --- | --- | --- |
+| `GET /health` | None | Public | `{"status": "ok"}` |
+| `GET /me` | Signed in | Any | `user` (id, email, full_name, avatar_url) and `workspaces` (id, name, auth_role, created_at) |
+| `GET /workspaces` | Signed in | Any | Workspaces the caller belongs to |
+| `POST /workspaces` | Signed in | Any | Creates a workspace; caller becomes Admin. Body `{name}` (1–80 chars, trimmed) |
+| `PATCH /workspace` | Workspace | Admin | Renames the workspace. Body `{name}` |
+| `DELETE /members/me` | Workspace | Any | Leaves the workspace. 409 if the caller is its last Admin |
+| `GET /members` | Workspace | Any | `members` with profiles; `invites` (pending) for Admins only |
+| `POST /admin/members` | Workspace | Admin | Body `{email, auth_role}`. Adds an existing account (`outcome: "added"`) or stores a pending invite (`"invited"`). 409 if already a member or already invited |
+| `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`. 409 if it would leave no Admin |
+| `DELETE /admin/members/{id}` | Workspace | Admin | Removes a member. 409 if it would leave no Admin |
+| `DELETE /admin/invites/{id}` | Workspace | Admin | Revokes a pending invite |
+| `GET /tasks` | Workspace | Any | `tasks` (with assignee and creator profiles) and `proposals` (pending agent actions) |
+| `POST /tasks` | Workspace | Admin | Body `{title, description?, status?, priority?, due_date?, assignee_id?, parent_task_id?}`. Assignee must be a member |
+| `PATCH /tasks/{id}` | Workspace | Admin: any field. Member: `status`, `position` only | Returns the updated task. 409 for a loop in the subtask tree |
+| `DELETE /tasks/{id}` | Workspace | Admin | Deletes the task and its subtasks |
+| `POST /agent/actions/{id}/approve` | Workspace | Admin | Writes the proposed task (`source: "agent"`), records the decision and audit entry atomically. 409 if already decided |
+| `POST /agent/actions/{id}/reject` | Workspace | Admin | Records the rejection and audit entry; writes no task. 409 if already decided |
+| `GET /documents` | Workspace | Any | Documents with status (`pending`, `processing`, `ready`, `failed`), `processing_stage` (`parsing`, `embedding`) and `embedded_count` while processing, parse error, page and chunk counts, parse stats, uploader |
+| `GET /documents/{id}` | Workspace | Any | The document plus `content_text` and every chunk's `char_start`, `char_end`, page, section, kind, token count and `embedded`. Available as soon as the document is chunked, while embedding runs ([D-034](../decisions.md#d-034)) |
+| `POST /documents/upload` | Workspace | Admin | Multipart `file` (PDF or DOCX, ≤ 25 MB). Returns 202 with `parsed_status: "pending"`; processing continues in the background. 409 duplicate, 413 too large, 415 unsupported type |
+| `POST /documents/{id}/reprocess` | Workspace | Admin | Re-runs parsing and embedding. 409 while already processing |
+| `DELETE /documents/{id}` | Workspace | Admin | Deletes the document, its chunks, embeddings and stored file |
+| `GET /notes` | Workspace | Any | Notes, newest first, with a plain-text preview and author |
+| `GET /notes/{id}` | Workspace | Any | One note with its block-tree `content` |
+| `POST /notes` | Workspace | Any | Body `{title?, content?}`; content must be a `doc` block tree ([D-029](../decisions.md#d-029)). Starts with an empty paragraph |
+| `PATCH /notes/{id}` | Workspace | Any | Body `{title?, content?}`. 422 for flat or invalid content |
+| `DELETE /notes/{id}` | Workspace | Author or Admin | 404 when the note does not exist or the caller may not delete it |
+| `POST /agent/chat` | Workspace | Any | Body `{message, history?}`. The Assistant: the agent picks its tools, including the document tools `lookup_fact`, `explore_documents` and `summarize_documents` ([D-042](../decisions.md#d-042)). Returns `{reply, steps, proposals, tasks, answers, injection_detected, models}`; each item in `answers` has the `POST /agent/ask` response shape. At most two document answers per message |
+| `POST /agent/ask` | Workspace | Any | Body `{question, document_ids?, profile?}`. Returns the answer, citations, confidence, groundedness, flags and a retrieval summary (below). Not used by the app since D-042; kept for scripts and the evals |
+| `GET /agent/answers` | Workspace | Any | The caller's 30 most recent answers in this workspace |
+
+"Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
+
+### Checked answer (`POST /agent/ask` response, and each item of `answers` from `POST /agent/chat`)
+
+```json
+{
+  "answer_id": "uuid",
+  "question": "What is the rectifier inspection interval?",
+  "answer": "Six months after the firmware upgrade [1].",
+  "answerable": true,
+  "citations": [
+    { "ordinal": 1, "chunk_id": "uuid", "document_id": "uuid", "file_name": "policy.docx",
+      "char_start": 120, "char_end": 318, "page": 2, "section": "Policy > Intervals", "excerpt": "..." }
+  ],
+  "confidence": { "value": 0.71, "label": "uncalibrated", "basis": "Mean reranker relevance ..." },
+  "grounded": true,
+  "flagged": false,
+  "flag_reasons": [],
+  "retrieval": { "run_id": "uuid", "attempts": 1, "grade": "good", "final_query": "...",
+                 "top_score": 0.83, "reranked": true, "latency_ms": 2840 },
+  "model": "gemini-3.5-flash"
+}
+```
+
+- **Offsets.** `char_start` and `char_end` index into the document's `content_text` (from `GET /documents/{id}`), counted in Unicode code points ([D-023](../decisions.md#d-023)).
+- **Confidence.** It is never shown without its `label` ([D-027](../decisions.md#d-027)). `value` is `null` when no reranker score was available.
+- **Errors.** 503 when the model provider is unavailable.
+
+## Planned (MUST scope)
+
+| Method and path | Role | Purpose |
+| --- | --- | --- |
+| `GET /admin/review-queue` | Admin | Flagged answers and pending actions |
+| `POST /admin/reviews/{target_type}/{target_id}` | Admin | Record a review decision |
+| `GET /admin/audit-log` | Admin | Audit trail |
+| `GET /admin/pipeline-health` | Admin | Metrics computed from `retrieval_runs` |
+
+Beyond the PRD: the workspace and member routes ([D-006](../decisions.md#d-006), [D-007](../decisions.md#d-007)), and `POST`, `PATCH` and `DELETE /tasks` for the task views ([D-020](../decisions.md#d-020), [D-021](../decisions.md#d-021)).

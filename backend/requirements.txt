@@ -1,0 +1,14 @@
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic-settings==2.15.0
+pyjwt[crypto]==2.14.0
+httpx==0.28.1
+python-multipart
+pytest==9.1.1
+# Document parsing (PDF: AGPL, see docs/decisions.md D-024)
+pymupdf==1.28.2
+python-docx==1.2.0
+# Models: Gemini for embeddings and generation, Voyage for reranking
+google-genai==2.23.0
+voyageai==0.5.0
+numpy==2.5.3

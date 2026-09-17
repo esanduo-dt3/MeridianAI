@@ -1,0 +1,19 @@
+// The golden set. Copy to golden.jsonl and replace these with your own questions.
+// One JSON object per line. Lines starting with // and blank lines are ignored.
+//
+// Required: id, question, expected_quote (unless answerable is false).
+// expected_quote must be VERBATIM from the document's extracted text, 8-20 words,
+// and must sit inside a single passage. Run `python -m evals.validate` to check.
+//
+// profile: lookup | explore | summarize          (default lookup)
+// kind:    single_passage | multi_hop | cross_doc | table | unanswerable
+//
+// Gate G1 is scored over the ANSWERABLE questions only. Aim for 15 of them.
+// Add refusal questions with "answerable": false and no quote; they are reported
+// separately, because an unanswerable question has no correct passage to cite.
+
+{"id": "G-01", "kind": "single_passage", "profile": "lookup", "question": "Replace with a question whose answer is one specific fact in one document.", "document": "first-project-spec.pdf", "expected_quote": "paste the exact sentence the answer rests on", "expected_answer": "One sentence, written by you, that a correct answer must say.", "notes": "Why this question is in the set."}
+{"id": "G-02", "kind": "cross_doc", "profile": "lookup", "question": "Replace with a question whose wording also appears in another project's docs.", "document": "second-project-spec.pdf", "expected_quote": "paste the exact sentence from the CORRECT project", "also_acceptable": [], "expected_answer": "...", "notes": "Distractor: the same term appears in first-project-spec.pdf."}
+{"id": "G-03", "kind": "table", "profile": "lookup", "question": "Replace with a question answered by a figure in a table.", "document": "third-project-report.docx", "expected_quote": "paste the table row or caption text", "expected_answer": "...", "notes": "Tests table extraction."}
+{"id": "G-04", "kind": "multi_hop", "profile": "explore", "question": "Replace with a question needing two passages.", "document": "first-project-spec.pdf", "expected_quote": "paste the harder of the two sentences", "also_acceptable": ["paste the other supporting sentence"], "expected_answer": "...", "notes": "Either passage is a legitimate citation."}
+{"id": "R-01", "kind": "unanswerable", "profile": "lookup", "answerable": false, "question": "Replace with something plausible that the corpus genuinely does not cover.", "expected_answer": "Should refuse: the documents do not cover this.", "notes": "Refusal set, scored separately from G1."}

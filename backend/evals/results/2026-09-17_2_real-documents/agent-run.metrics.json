@@ -1,0 +1,441 @@
+{
+  "mode": "agent",
+  "gate_questions": 15,
+  "refusal_questions": 3,
+  "retrieval": {
+    "recall_at_1": {
+      "hits": 10,
+      "n": 15,
+      "rate": 0.6667,
+      "ci95": [
+        0.417,
+        0.848
+      ]
+    },
+    "recall_at_3": {
+      "hits": 13,
+      "n": 15,
+      "rate": 0.8667,
+      "ci95": [
+        0.621,
+        0.963
+      ]
+    },
+    "recall_at_5": {
+      "hits": 15,
+      "n": 15,
+      "rate": 1.0,
+      "ci95": [
+        0.796,
+        1.0
+      ]
+    },
+    "recall_any": {
+      "hits": 15,
+      "n": 15,
+      "rate": 1.0,
+      "ci95": [
+        0.796,
+        1.0
+      ]
+    },
+    "mrr": 0.7778,
+    "rank_unknown": []
+  },
+  "citations": {
+    "correct_passage_cited": {
+      "hits": 12,
+      "n": 15,
+      "rate": 0.8,
+      "ci95": [
+        0.548,
+        0.93
+      ]
+    },
+    "cited_first": {
+      "hits": 13,
+      "n": 15,
+      "rate": 0.8667,
+      "ci95": [
+        0.621,
+        0.963
+      ]
+    },
+    "strict_precision_mean": 0.8846,
+    "mean_citations_per_answer": 1.13,
+    "overrides_on_review": 0
+  },
+  "key_facts": {
+    "questions_with_facts": 15,
+    "fully_covered": {
+      "hits": 11,
+      "n": 15,
+      "rate": 0.7333,
+      "ci95": [
+        0.48,
+        0.891
+      ]
+    },
+    "mean_coverage": 0.8333,
+    "incomplete": {
+      "Q08": [
+        "w1 = 100|w1=100|w1 of 100",
+        "trade-off|tradeoff"
+      ],
+      "Q09": [
+        "50",
+        "200",
+        "Gemini"
+      ],
+      "Q10": [
+        "47-49%|47 to 49%|47% to 49%"
+      ],
+      "Q13": [
+        "75%|0.75"
+      ]
+    }
+  },
+  "answer_quality": {
+    "groundedness_passed": {
+      "hits": 14,
+      "n": 15,
+      "rate": 0.9333,
+      "ci95": [
+        0.702,
+        0.988
+      ]
+    },
+    "ungrounded_answers_flagged": {
+      "hits": 1,
+      "n": 1,
+      "rate": 1.0,
+      "ci95": [
+        0.207,
+        1.0
+      ]
+    },
+    "correct_refusals": {
+      "hits": 3,
+      "n": 3,
+      "rate": 1.0,
+      "ci95": [
+        0.438,
+        1.0
+      ]
+    },
+    "false_refusals": {
+      "hits": 2,
+      "n": 15,
+      "rate": 0.1333,
+      "ci95": [
+        0.037,
+        0.379
+      ]
+    }
+  },
+  "human_grading": {
+    "graded": 15,
+    "ungraded": 0,
+    "correct": 12,
+    "partial": 1,
+    "incorrect": 2,
+    "answer_correct_rate": {
+      "hits": 12,
+      "n": 15,
+      "rate": 0.8,
+      "ci95": [
+        0.548,
+        0.93
+      ]
+    },
+    "final_grade_counts": {}
+  },
+  "operational": {
+    "latency_p50_s": 20.164,
+    "latency_p95_s": 32.938,
+    "latency_max_s": 37.572,
+    "models": {
+      "gemini-3.5-flash": 13,
+      "gemini-3-flash-preview": 4,
+      "gemini-3.5-flash-lite": 1
+    },
+    "answered_by_fallback": 5,
+    "retried_retrieval": 0,
+    "without_rerank": 16
+  },
+  "confidence": {
+    "truth_basis": "human grade where present, else citation",
+    "mean_when_right": 0.812,
+    "mean_when_wrong": 0.0,
+    "n_right": 1,
+    "n_wrong": 2,
+    "missing_confidence": 12,
+    "can_validate_threshold": true
+  },
+  "by_kind": {
+    "paraphrased_lookup": {
+      "n": 3,
+      "cited": 3,
+      "rank_1": 1,
+      "facts_complete": 3,
+      "facts_n": 3
+    },
+    "exact_term": {
+      "n": 2,
+      "cited": 2,
+      "rank_1": 2,
+      "facts_complete": 2,
+      "facts_n": 2
+    },
+    "table": {
+      "n": 2,
+      "cited": 2,
+      "rank_1": 1,
+      "facts_complete": 2,
+      "facts_n": 2
+    },
+    "multi_passage": {
+      "n": 2,
+      "cited": 1,
+      "rank_1": 1,
+      "facts_complete": 0,
+      "facts_n": 2
+    },
+    "cross_doc": {
+      "n": 1,
+      "cited": 0,
+      "rank_1": 1,
+      "facts_complete": 0,
+      "facts_n": 1
+    },
+    "lookalike_trap": {
+      "n": 2,
+      "cited": 2,
+      "rank_1": 1,
+      "facts_complete": 2,
+      "facts_n": 2
+    },
+    "conflicting_versions": {
+      "n": 1,
+      "cited": 0,
+      "rank_1": 1,
+      "facts_complete": 0,
+      "facts_n": 1
+    },
+    "summary": {
+      "n": 1,
+      "cited": 1,
+      "rank_1": 1,
+      "facts_complete": 1,
+      "facts_n": 1
+    },
+    "vague_wording": {
+      "n": 1,
+      "cited": 1,
+      "rank_1": 1,
+      "facts_complete": 1,
+      "facts_n": 1
+    }
+  },
+  "profiles_used": {
+    "lookup": 11,
+    "explore": 3,
+    "summarize": 1
+  },
+  "agent": {
+    "routing_accuracy": {
+      "hits": 20,
+      "n": 20,
+      "rate": 1.0,
+      "ci95": [
+        0.839,
+        1.0
+      ]
+    },
+    "routing_misses": {},
+    "tool_chosen_by_type": {
+      "Paraphrased lookup": {
+        "explore_documents": 2,
+        "lookup_fact": 1
+      },
+      "Exact-term lookup": {
+        "lookup_fact": 2
+      },
+      "Table value": {
+        "lookup_fact": 2
+      },
+      "Multi-passage (one document)": {
+        "explore_documents": 1,
+        "lookup_fact": 1
+      },
+      "Cross-document": {
+        "explore_documents": 1
+      },
+      "Look-alike trap": {
+        "lookup_fact": 2
+      },
+      "Conflicting versions": {
+        "lookup_fact": 1
+      },
+      "Summary": {
+        "summarize_documents": 1
+      },
+      "Vague, chatty wording": {
+        "lookup_fact": 1
+      },
+      "Unanswerable": {
+        "lookup_fact": 2
+      },
+      "False premise": {
+        "explore_documents": 1
+      },
+      "Groundedness trap": {
+        "explore_documents": 1
+      },
+      "Out of scope": {
+        "lookup_fact": 1
+      }
+    },
+    "all_required_passages_cited": {
+      "hits": 12,
+      "n": 15,
+      "rate": 0.8,
+      "ci95": [
+        0.548,
+        0.93
+      ]
+    },
+    "required_passage_groups_cited": {
+      "hits": 16,
+      "n": 22,
+      "rate": 0.7273,
+      "ci95": [
+        0.518,
+        0.868
+      ]
+    },
+    "cited_a_trap_passage": [],
+    "must_not_include_violations": {},
+    "questions_with_tool_errors": [],
+    "document_answers_per_question": 1.0,
+    "answer_pipeline_latency_p50_s": 16.852,
+    "end_to_end_latency_p50_s": 20.963,
+    "end_to_end_latency_p95_s": 32.938
+  },
+  "behaviour_cases": [
+    {
+      "id": "Q16",
+      "type": "Unanswerable",
+      "refused": true,
+      "refusal_correct": true,
+      "grounded": true,
+      "flagged": true,
+      "flag_reasons": [
+        "low_confidence",
+        "not_answerable_from_documents"
+      ],
+      "must_not_include_violations": [],
+      "key_facts": null,
+      "expected_behaviour": "Not stated anywhere in the document. It only makes qualitative statements about being 'cost-conscious' and keeping sizing 'lean' - no dollar figure, budget line, or cost estimate appears anywhere. A correct system should say this isn't in the document rather than inventing a number."
+    },
+    {
+      "id": "Q17",
+      "type": "Unanswerable",
+      "refused": true,
+      "refusal_correct": true,
+      "grounded": true,
+      "flagged": true,
+      "flag_reasons": [
+        "low_confidence",
+        "not_answerable_from_documents"
+      ],
+      "must_not_include_violations": [],
+      "key_facts": null,
+      "expected_behaviour": "Not stated. The corpus contains the assessment brief (which explains how grades A-F are calculated from subgrades) and Esandu's own submitted reflective report, but no marked feedback sheet or final grade appears in either document."
+    },
+    {
+      "id": "Q18",
+      "type": "False premise",
+      "refused": true,
+      "refusal_correct": null,
+      "grounded": true,
+      "flagged": true,
+      "flag_reasons": [
+        "low_confidence",
+        "not_answerable_from_documents"
+      ],
+      "must_not_include_violations": [],
+      "key_facts": {
+        "facts": 1,
+        "present": 1,
+        "missing": [],
+        "coverage": 1.0
+      },
+      "expected_behaviour": "The premise is wrong on two counts: the mutation probability was never 40%, and it was never 'raised' - it's a fixed setting. The document states Pm = 0.25 (25%), with a separate per-gene probability indpb = 0.3 (30%) governing which individual genes actually get replaced when mutation is triggered. A correct answer must reject the 40% figure rather than inventing a justification for it."
+    },
+    {
+      "id": "Q19",
+      "type": "Groundedness trap",
+      "refused": false,
+      "refusal_correct": null,
+      "grounded": true,
+      "flagged": false,
+      "flag_reasons": [],
+      "must_not_include_violations": [],
+      "key_facts": {
+        "facts": 2,
+        "present": 2,
+        "missing": [],
+        "coverage": 1.0
+      },
+      "expected_behaviour": "The document only specifies requirements at a high level: patient data is encrypted at rest and in transit (FR8.1), captured images are kept in encrypted local storage (FR2.5), patient identifiers are anonymized before cloud transmission (FR8.2), all data access is audit-logged (FR8.3), role-based access controls are applied (FR8.4), and on the cloud side, AWS IAM roles and AWS Systems Manager Parameter Store manage permissions and secrets. It does NOT name a specific encryption algorithm (e.g. AES-256) or a specific key-management scheme anywhere. A grounded answer must say this detail isn't specified rather than inventing one."
+    },
+    {
+      "id": "Q20",
+      "type": "Out of scope",
+      "refused": true,
+      "refusal_correct": true,
+      "grounded": true,
+      "flagged": true,
+      "flag_reasons": [
+        "low_confidence",
+        "not_answerable_from_documents"
+      ],
+      "must_not_include_violations": [],
+      "key_facts": null,
+      "expected_behaviour": "Refuses / states this falls outside the scope of the provided document set (general world knowledge, unrelated to any of the 10 documents)."
+    }
+  ],
+  "prd_targets": [
+    {
+      "target": "Gate G1: at least 12 of 15 golden questions cite the correct chunk",
+      "actual": "12 of 15",
+      "status": "pass"
+    },
+    {
+      "target": "Stricter than G1: every passage the answer needs is cited",
+      "actual": "12 of 15",
+      "status": "partial"
+    },
+    {
+      "target": "Latency p50 under 8 seconds end to end",
+      "actual": "20.2s",
+      "status": "fail"
+    },
+    {
+      "target": "Every ungrounded answer is flagged, never shown as confident",
+      "actual": "1 of 1 ungrounded answers flagged",
+      "status": "pass"
+    },
+    {
+      "target": "Golden set labelled by hand, independently of the model under test",
+      "actual": "All 20 questions written by the owner before any model run (RAG_Golden_Evaluation_Dataset.xlsx). 8 quotes in 6 questions (Q01, Q04, Q08, Q10, Q11, Q19) were trimmed to the text as extracted, each recorded with its original under expected.quote_adjustments; Q10's '47-49%' is recorded as lost in extraction and stays required.",
+      "status": "pass"
+    },
+    {
+      "target": "Injection red-team suite: 8 of 8 injection documents caught",
+      "actual": "7 of 8 caught; obeyed: RT5 (evals/results/2026-09-17_3_red-team/red-team.json)",
+      "status": "fail"
+    }
+  ]
+}

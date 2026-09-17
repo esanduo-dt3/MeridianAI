@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian Eval Grader</title>
+<style>
+  /*
+    Grades a Meridian evaluation results file (backend/evals/results/*.json).
+    Everything stays on this machine: no server, no network requests, no
+    external fonts or scripts. Text from results is only ever set as text,
+    never as HTML, because answers and excerpts come from documents.
+  */
+  :root {
+    --paper: #f4f5f2; --surface: #ffffff; --sunken: #eceee9;
+    --ink: #111418; --ink-2: #454d57; --ink-3: #69717b;
+    --rule: #e1e4df; --rule-strong: #c9cec8;
+    --cobalt: #2743c9; --cobalt-wash: #eaedfb;
+    --mark: #ffe27a;
+    --good: #16704a; --good-wash: #e5f1ea;
+    --flag: #9a4e00; --flag-wash: #fbefe1;
+    --bad: #b42318; --bad-wash: #fdecea;
+    --radius: 12px; --radius-s: 8px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0d0f12; --surface: #15181c; --sunken: #1c2025;
+      --ink: #eceef1; --ink-2: #b4bac2; --ink-3: #8b939d;
+      --rule: #252a30; --rule-strong: #343a42;
+      --cobalt: #8098ff; --cobalt-wash: #1b2244;
+      --mark: #5b4a0f;
+      --good: #52c58e; --good-wash: #11281d;
+      --flag: #f0a64a; --flag-wash: #2d2011;
+      --bad: #ff7d74; --bad-wash: #3a1614;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, select, textarea, input { font: inherit; color: inherit; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .muted { color: var(--ink-3); }
+  .hidden { display: none !important; }
+
+  /* Layout */
+  header.top {
+    position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--rule);
+  }
+  header.top h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  .spacer { flex: 1; }
+  .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: calc(100% - 57px); }
+  @media (max-width: 860px) { .app { grid-template-columns: 1fr; height: auto; } aside.list { max-height: 45vh; } }
+  aside.list { border-right: 1px solid var(--rule); overflow-y: auto; overflow-x: hidden; background: var(--surface); }
+  main { overflow-y: auto; padding: 20px 16px 80px; }
+  .wrap { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  /* Controls */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; cursor: pointer;
+    border-radius: var(--radius-s); border: 1px solid var(--rule-strong); background: var(--surface);
+  }
+  .btn:hover { border-color: var(--ink-3); }
+  .btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .btn:focus-visible, .seg button:focus-visible, .qitem:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .btn[disabled] { opacity: .5; cursor: not-allowed; }
+  .seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: var(--radius-s); overflow: hidden; }
+  .seg button { border: 0; background: var(--surface); padding: 8px 14px; cursor: pointer; border-right: 1px solid var(--rule); min-height: 38px; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"].correct { background: var(--good-wash); color: var(--good); font-weight: 600; }
+  .seg button[aria-pressed="true"].partial { background: var(--flag-wash); color: var(--flag); font-weight: 600; }
+  .seg button[aria-pressed="true"].incorrect { background: var(--bad-wash); color: var(--bad); font-weight: 600; }
+  .seg button[aria-pressed="true"].neutral { background: var(--sunken); font-weight: 600; }
+  textarea {
+    width: 100%; min-height: 72px; resize: vertical; padding: 8px 10px;
+    border: 1px solid var(--rule-strong); border-radius: var(--radius-s); background: var(--surface);
+  }
+  select { min-height: 34px; border: 1px solid var(--rule-strong); border-radius: var(--radius-s); background: var(--surface); padding: 0 8px; }
+
+  /* Summary */
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stat { padding: 4px 10px; border-radius: 999px; background: var(--sunken); font-size: 12.5px; white-space: nowrap; }
+  .stat b { font-weight: 650; }
+  .save-state { font-size: 12.5px; }
+  .save-state.dirty { color: var(--flag); }
+  .save-state.saved { color: var(--good); }
+
+  /* List */
+  .filters { position: sticky; top: 0; background: var(--surface); padding: 10px 12px; border-bottom: 1px solid var(--rule); display: flex; gap: 8px; align-items: center; }
+  .filters select { flex: 1; }
+  .qitem { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--rule); background: none; border-left: 3px solid transparent; width: 100%; text-align: left; border-top: 0; border-right: 0; }
+  .qitem:hover { background: var(--paper); }
+  .qitem[aria-current="true"] { background: var(--cobalt-wash); border-left-color: var(--cobalt); }
+  .qitem .id { font-weight: 650; min-width: 34px; }
+  .qitem .q { font-size: 12.5px; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 5px; border: 2px solid var(--rule-strong); }
+  .dot.correct { background: var(--good); border-color: var(--good); }
+  .dot.partial { background: var(--flag); border-color: var(--flag); }
+  .dot.incorrect { background: var(--bad); border-color: var(--bad); }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin: 0 0 8px; font-weight: 600; }
+  .card h3 { font-size: 13px; margin: 12px 0 6px; }
+  .qtitle { font-size: 19px; font-weight: 650; letter-spacing: -0.015em; margin: 4px 0 0; line-height: 1.35; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: var(--sunken); color: var(--ink-2); }
+  .badge.good { background: var(--good-wash); color: var(--good); }
+  .badge.flag { background: var(--flag-wash); color: var(--flag); }
+  .badge.bad { background: var(--bad-wash); color: var(--bad); }
+  .badge.cobalt { background: var(--cobalt-wash); color: var(--cobalt); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+  .answer-text { white-space: pre-wrap; font-size: 15px; line-height: 1.7; }
+  .cite { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--cobalt); background: none; border: 0; padding: 0 2px; cursor: pointer; vertical-align: super; text-decoration: underline; }
+  .citation { border: 1px solid var(--rule); border-radius: var(--radius-s); padding: 8px 10px; margin-top: 6px; }
+  .citation.hit { border-color: var(--good); }
+  .citation.trap { border-color: var(--bad); }
+  .citation.active { box-shadow: 0 0 0 2px var(--cobalt); }
+  .excerpt { font-size: 13px; color: var(--ink-2); white-space: pre-wrap; margin-top: 4px; }
+  mark { background: var(--mark); color: var(--ink); padding: 0 2px; border-radius: 3px; }
+  dl.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: var(--ink-3); }
+  dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+  ul.facts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  details > summary { cursor: pointer; color: var(--ink-2); }
+  details[open] > summary { margin-bottom: 8px; }
+  .quote { border-left: 3px solid var(--mark); padding: 2px 10px; margin: 6px 0; font-size: 13px; white-space: pre-wrap; }
+  .adjust { font-size: 12.5px; background: var(--paper); border-radius: var(--radius-s); padding: 6px 10px; margin-top: 6px; }
+  .grade { border-color: var(--cobalt); box-shadow: 0 0 0 1px var(--cobalt); }
+  .grade .row { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start; }
+  .grade label.h { display: block; font-size: 12px; color: var(--ink-3); margin-bottom: 4px; }
+  .help { font-size: 12px; color: var(--ink-3); margin-top: 4px; max-width: 46ch; }
+  .empty { text-align: center; padding: 60px 20px; }
+  .drop { border: 2px dashed var(--rule-strong); border-radius: var(--radius); padding: 40px 20px; margin: 20px auto; max-width: 560px; background: var(--surface); }
+  .drop.over { border-color: var(--cobalt); background: var(--cobalt-wash); }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 11px; border: 1px solid var(--rule-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Meridian Eval Grader</h1>
+  <span id="fileLabel" class="muted mono" style="font-size:12px"></span>
+  <div class="stats" id="stats"></div>
+  <div class="spacer"></div>
+  <span id="saveState" class="save-state"></span>
+  <button class="btn" id="openBtn" type="button">Open results file…</button>
+  <button class="btn primary" id="saveBtn" type="button" disabled>Save grades</button>
+</header>
+
+<div class="app hidden" id="app">
+  <aside class="list" aria-label="Questions">
+    <div class="filters">
+      <label class="muted" for="filter" style="font-size:12px">Show</label>
+      <select id="filter">
+        <option value="all">All questions</option>
+        <option value="ungraded">Ungraded</option>
+        <option value="gate">Gate questions (G1)</option>
+        <option value="behaviour">Behaviour cases</option>
+        <option value="auto-miss">Auto: correct passage not cited</option>
+        <option value="flagged">Flagged answers</option>
+      </select>
+    </div>
+    <div id="list"></div>
+  </aside>
+  <main id="main"><div class="wrap" id="detail"></div></main>
+</div>
+
+<div id="welcome" class="empty">
+  <div class="drop" id="drop">
+    <p style="font-size:16px;font-weight:600;margin:0 0 6px">Open an evaluation results file</p>
+    <p class="muted" style="margin:0 0 14px">For example <span class="mono">backend/evals/results/2026-09-17_2_real-documents/agent-run.json</span>. Drop it here or use the button.</p>
+    <button class="btn primary" id="openBtn2" type="button">Open results file…</button>
+    <p class="muted" style="font-size:12px;margin:16px 0 0">In Chrome or Edge, grades save straight back into the same file.<br>In other browsers, saving downloads the graded file to replace the original.</p>
+  </div>
+  <input type="file" id="fileInput" accept=".json,application/json" class="hidden">
+  <p class="muted" style="font-size:12px">Keys: <kbd>j</kbd>/<kbd>k</kbd> next/previous · <kbd>1</kbd> correct · <kbd>2</kbd> partial · <kbd>3</kbd> incorrect · <kbd>0</kbd> clear · <kbd>n</kbd> notes · <kbd>⌘/Ctrl</kbd>+<kbd>S</kbd> save</p>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- State ---------- */
+const state = {
+  data: null,          // the whole results file, edited in place
+  fileName: "",
+  handle: null,        // File System Access handle, when the browser supports writing back
+  index: 0,
+  filter: "all",
+  dirty: false,
+  activeCitation: null,
+};
+
+const $ = (id) => document.getElementById(id);
+
+/* ---------- Pure helpers, mirroring backend/evals/metrics.py ---------- */
+function fold(text) {
+  return String(text || "")
+    .normalize("NFKC").toLowerCase()
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[‐-―−-]/g, " ")
+    .replace(/\s+/g, " ").trim();
+}
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+function factPresent(answer, fact) {
+  const hay = fold(answer);
+  return String(fact).split("|").some((alt) => {
+    const needle = fold(alt);
+    return needle && new RegExp("(?<![0-9a-z])" + escapeRegex(needle) + "(?![0-9a-z])").test(hay);
+  });
+}
+function isGate(q) { return q.gate !== undefined ? !!q.gate : q.answerable_expected !== false; }
+function cited(q) {
+  const g = q.grading || {};
+  if (g.citation_acceptable === false) return false;
+  return !!(q.auto_score && q.auto_score.expected_chunk_cited) || g.citation_acceptable === true;
+}
+function gradeKey(v) { return v === true ? "correct" : v === false ? "incorrect" : v === "partial" ? "partial" : ""; }
+function shownText(q) {
+  const r = q.result || {};
+  return [r.answer || "", r.reply || ""].join("\n");
+}
+
+/* ---------- DOM helpers: text only, never HTML from the file ---------- */
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") node.className = v;
+    else if (k === "text") node.textContent = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of children.flat()) {
+    if (c === null || c === undefined || c === false) continue;
+    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return node;
+}
+function badge(text, tone) { return el("span", { class: "badge " + (tone || ""), text }); }
+
+/* ---------- Loading and saving ---------- */
+function draftKey() {
+  const run = (state.data && state.data.run) || {};
+  return "meridian-grader:" + state.fileName + ":" + (run.started_at || "");
+}
+
+function load(text, name, handle) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { alert("That file is not valid JSON."); return; }
+  if (!data || !Array.isArray(data.questions)) { alert("That file has no questions array; it is not a Meridian results file."); return; }
+  state.data = data; state.fileName = name; state.handle = handle || null; state.index = 0; state.dirty = false;
+  for (const q of data.questions) q.grading = Object.assign({ answer_correct: null, citation_acceptable: null, notes: "" }, q.grading || {});
+
+  // A draft newer than the file (for example after closing the tab) is offered back.
+  try {
+    const draft = JSON.parse(localStorage.getItem(draftKey()) || "null");
+    if (draft && draft.grades) {
+      const differs = data.questions.some((q) => JSON.stringify(draft.grades[q.id] || null) !== JSON.stringify(pickGrade(q.grading)));
+      if (differs && confirm("There are unsaved grades from an earlier session for this file. Restore them?")) {
+        for (const q of data.questions) if (draft.grades[q.id]) Object.assign(q.grading, draft.grades[q.id]);
+        state.dirty = true;
+      }
+    }
+  } catch (e) { /* storage unavailable: grading still works, just without drafts */ }
+
+  $("welcome").classList.add("hidden");
+  $("app").classList.remove("hidden");
+  $("saveBtn").disabled = false;
+  $("fileLabel").textContent = name + (handle ? "" : "  (saving will download)");
+  render();
+}
+
+function pickGrade(g) { return { answer_correct: g.answer_correct, citation_acceptable: g.citation_acceptable, notes: g.notes || "" }; }
+
+function saveDraft() {
+  try {
+    const grades = {};
+    for (const q of state.data.questions) grades[q.id] = pickGrade(q.grading);
+    localStorage.setItem(draftKey(), JSON.stringify({ grades, at: new Date().toISOString() }));
+  } catch (e) { /* ignore */ }
+}
+
+function markDirty() { state.dirty = true; saveDraft(); renderSaveState(); renderStats(); renderList(); }
+
+async function openFile() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({ types: [{ description: "Results", accept: { "application/json": [".json"] } }] });
+      const file = await handle.getFile();
+      load(await file.text(), file.name, handle);
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+      // fall through to the plain input, e.g. when the page is blocked from using the picker
+    }
+  }
+  $("fileInput").click();
+}
+
+async function save() {
+  if (!state.data) return;
+  state.data.run = state.data.run || {};
+  state.data.run.graded_with = "backend/evals/grader.html";
+  state.data.run.last_graded_at = new Date().toISOString();
+  const text = JSON.stringify(state.data, null, 2) + "\n";
+  try {
+    if (state.handle && state.handle.createWritable) {
+      const perm = await state.handle.requestPermission?.({ mode: "readwrite" });
+      if (perm && perm !== "granted") throw new Error("Permission to write was not granted.");
+      const w = await state.handle.createWritable();
+      await w.write(text); await w.close();
+    } else {
+      const a = el("a", { href: URL.createObjectURL(new Blob([text], { type: "application/json" })), download: state.fileName || "graded-results.json" });
+      document.body.append(a); a.click(); a.remove();
+    }
+    state.dirty = false;
+    try { localStorage.removeItem(draftKey()); } catch (e) { /* ignore */ }
+    renderSaveState(true);
+  } catch (e) {
+    alert("Could not save: " + (e && e.message ? e.message : e) + "\nYour grades are still kept as a draft in this browser.");
+  }
+}
+
+/* ---------- Rendering ---------- */
+function visibleQuestions() {
+  const qs = state.data.questions;
+  const f = state.filter;
+  return qs.map((q, i) => ({ q, i })).filter(({ q }) => {
+    if (f === "ungraded") return q.grading.answer_correct === null || q.grading.answer_correct === undefined;
+    if (f === "gate") return isGate(q);
+    if (f === "behaviour") return !isGate(q);
+    if (f === "auto-miss") return isGate(q) && !(q.auto_score && q.auto_score.expected_chunk_cited);
+    if (f === "flagged") return q.result && q.result.flagged;
+    return true;
+  });
+}
+
+function render() { renderStats(); renderList(); renderDetail(); renderSaveState(); }
+
+function renderSaveState(justSaved) {
+  const s = $("saveState");
+  if (!state.data) { s.textContent = ""; return; }
+  s.className = "save-state " + (state.dirty ? "dirty" : justSaved ? "saved" : "");
+  s.textContent = state.dirty ? "Unsaved grades (draft kept)" : justSaved ? "Saved" : "";
+}
+
+function renderStats() {
+  const qs = state.data.questions.filter((q) => !q.error);
+  const gate = qs.filter(isGate);
+  const graded = qs.filter((q) => q.grading.answer_correct !== null && q.grading.answer_correct !== undefined);
+  const correct = graded.filter((q) => q.grading.answer_correct === true).length;
+  const partial = graded.filter((q) => q.grading.answer_correct === "partial").length;
+  const g1 = gate.filter(cited).length;
+  const box = $("stats"); box.replaceChildren(
+    el("span", { class: "stat" }, "Graded ", el("b", { text: `${graded.length}/${qs.length}` })),
+    el("span", { class: "stat" }, "Correct ", el("b", { text: String(correct) }), partial ? ` · partial ${partial}` : ""),
+    el("span", { class: "stat", title: "Gate questions citing a correct passage, after your citation overrides" }, "G1 ", el("b", { text: `${g1}/${gate.length}` }), gate.length === 15 ? (g1 >= 12 ? " pass" : " fail") : ""),
+  );
+}
+
+function renderList() {
+  const list = $("list"); list.replaceChildren();
+  for (const { q, i } of visibleQuestions()) {
+    const item = el("button", {
+      class: "qitem", type: "button", "aria-current": i === state.index ? "true" : "false",
+      onclick: () => { state.index = i; state.activeCitation = null; renderList(); renderDetail(); $("main").scrollTop = 0; },
+    },
+      el("span", { class: "dot " + gradeKey(q.grading.answer_correct), "aria-label": gradeKey(q.grading.answer_correct) || "ungraded" }),
+      el("span", {},
+        el("span", { class: "id", text: q.id }), " ",
+        el("span", { class: "muted", style: "font-size:11.5px", text: q.type_label || q.kind || "" }),
+        el("span", { class: "q", text: q.question })));
+    list.append(item);
+  }
+}
+
+function citationMarkers(text, citations, answerIndex) {
+  // Turn [n] into buttons that highlight the matching citation card.
+  const frag = document.createDocumentFragment();
+  const re = /\[(\d+)\]/g; let last = 0; let m;
+  while ((m = re.exec(text))) {
+    frag.append(text.slice(last, m.index));
+    const n = Number(m[1]);
+    const exists = (citations || []).some((c) => c.ordinal === n);
+    frag.append(exists
+      ? el("button", { class: "cite", type: "button", title: "Show cited passage", text: `[${n}]`,
+          onclick: () => { state.activeCitation = `${answerIndex}:${n}`; renderDetail(true); } })
+      : `[${n}]`);
+    last = m.index + m[0].length;
+  }
+  frag.append(text.slice(last));
+  return frag;
+}
+
+function renderDetail(keepScroll) {
+  const q = state.data.questions[state.index];
+  const d = $("detail"); d.replaceChildren();
+  if (!q) return;
+  const r = q.result || {}; const a = q.auto_score || {}; const e = q.expected || {};
+  const expectedIds = new Set(e.chunk_ids || []);
+  const trapIds = new Set(e.distractor_chunk_ids || []);
+
+  /* Header */
+  const toolOk = a.routing_ok;
+  d.append(el("div", { class: "card" },
+    el("div", { class: "badges" },
+      badge(q.id, "cobalt"), badge(q.type_label || q.kind || "question"),
+      isGate(q) ? badge("G1 gate question") : badge("Behaviour case — not in G1", "flag"),
+      q.answerable_expected === false ? badge("Expected: refusal") : null),
+    el("p", { class: "qtitle", text: q.question }),
+    q.error ? el("p", { class: "badge bad", text: "Did not complete: " + q.error }) : null));
+
+  /* Expected vs automatic signals */
+  const facts = (e.must_include || []);
+  const shown = shownText(q);
+  const factList = el("ul", { class: "facts" }, facts.map((f) => {
+    const ok = factPresent(shown, f);
+    return el("li", {}, badge((ok ? "✓ " : "✗ ") + String(f).split("|").join(" or "), ok ? "good" : "bad"));
+  }));
+  const mustNot = (e.must_not_include || []);
+  const notList = el("ul", { class: "facts" }, mustNot.map((f) => {
+    const hit = factPresent(shown, f);
+    return el("li", {}, badge((hit ? "✗ used: " : "✓ absent: ") + String(f).split("|").join(" or "), hit ? "bad" : "good"));
+  }));
+
+  d.append(el("div", { class: "two" },
+    el("div", { class: "card" }, el("h2", { text: "Expected answer" }),
+      el("div", { class: "answer-text", style: "font-size:14px", text: e.expected_answer || "—" }),
+      facts.length ? [el("h3", { text: "Key facts (checked automatically)" }), factList] : null,
+      mustNot.length ? [el("h3", { text: "Must not appear" }), notList] : null),
+    el("div", { class: "card" }, el("h2", { text: "Automatic signals" }),
+      el("dl", { class: "kv" },
+        el("dt", { text: "Tool chosen" }), el("dd", {}, badge(a.document_tool_chosen || "—", toolOk === false ? "bad" : toolOk ? "good" : ""),
+          " expected ", (q.expected_tools || []).join(" or ") || "—"),
+        el("dt", { text: "Passage retrieved" }), el("dd", { text: a.expected_chunk_retrieved === undefined ? "—" : (a.expected_chunk_retrieved ? `yes, best rank ${a.rank_of_expected}` : "no") }),
+        el("dt", { text: "Required passages cited" }), el("dd", { text: a.required_groups ? `${a.required_groups_cited} of ${a.required_groups}` : (a.expected_chunk_cited ? "yes" : "—") }),
+        el("dt", { text: "Cited a trap passage" }), el("dd", {}, a.cited_distractor ? badge("yes", "bad") : "no"),
+        el("dt", { text: "Refused" }), el("dd", { text: a.refused === undefined ? "—" : String(a.refused) }),
+        el("dt", { text: "Grounded" }), el("dd", {}, r.grounded === null || r.grounded === undefined ? "—" : badge(String(r.grounded), r.grounded ? "good" : "bad")),
+        el("dt", { text: "Flagged" }), el("dd", {}, r.flagged ? badge((r.flag_reasons || []).join(", ") || "yes", "flag") : "no"),
+        el("dt", { text: "Confidence" }), el("dd", { class: "mono", text: `${JSON.stringify(r.confidences ?? r.confidence ?? null)} (uncalibrated)` }),
+        el("dt", { text: "Reranked" }), el("dd", {}, r.reranked === false ? badge("no", "flag") : String(r.reranked ?? "—")),
+        el("dt", { text: "Model" }), el("dd", {}, (r.answer_models || [r.model]).filter(Boolean).join(", ") || "—", a.answered_by_fallback_model ? [" ", badge("fallback", "flag")] : null),
+        el("dt", { text: "Latency" }), el("dd", { class: "mono", text: r.latency_ms ? `${(r.latency_ms / 1000).toFixed(1)} s end to end` : "—" })))));
+
+  /* What the user saw */
+  const saw = el("div", { class: "card" }, el("h2", { text: "What the user saw" }));
+  if (r.reply) saw.append(el("h3", { text: "Agent reply" }), el("div", { class: "answer-text", text: r.reply }));
+  const answers = r.checked_answers || (r.answer ? [{ answer: r.answer, citations: r.citations || [] }] : []);
+  answers.forEach((ans, ai) => {
+    saw.append(el("h3", {}, `Checked answer ${answers.length > 1 ? ai + 1 : ""}`.trim(), ans.answerable === false ? [" ", badge("says not answerable", "flag")] : null));
+    saw.append(el("div", { class: "answer-text" }, citationMarkers(ans.answer || "", ans.citations, ai)));
+    for (const c of ans.citations || []) {
+      const key = `${ai}:${c.ordinal}`;
+      const cls = "citation" + (expectedIds.has(c.chunk_id) ? " hit" : "") + (trapIds.has(c.chunk_id) ? " trap" : "") + (state.activeCitation === key ? " active" : "");
+      saw.append(el("div", { class: cls, id: "cite-" + key.replace(":", "-") },
+        el("div", { class: "badges" }, badge(`[${c.ordinal}]`, "cobalt"), badge(c.file_name || "document"),
+          c.page ? badge("p." + c.page) : null, badge(`chars ${c.char_start}–${c.char_end}`),
+          expectedIds.has(c.chunk_id) ? badge("expected passage", "good") : null,
+          trapIds.has(c.chunk_id) ? badge("trap passage", "bad") : null),
+        c.section ? el("div", { class: "muted", style: "font-size:12px;margin-top:4px", text: c.section }) : null,
+        el("div", { class: "excerpt", text: c.excerpt || "" })));
+    }
+    if (!(ans.citations || []).length) saw.append(el("p", { class: "muted", text: "No passages cited." }));
+  });
+  if (!answers.length && !r.reply) saw.append(el("p", { class: "muted", text: "No answer recorded." }));
+  d.append(saw);
+
+  /* Grading panel */
+  const g = q.grading;
+  const setAnswer = (v) => { g.answer_correct = g.answer_correct === v ? null : v; markDirty(); renderDetail(true); };
+  const setCitation = (v) => { g.citation_acceptable = v; markDirty(); renderDetail(true); };
+  const segBtn = (label, value, cls, current, onClick) => el("button", { type: "button", class: cls, "aria-pressed": String(current === value), text: label, onclick: () => onClick(value) });
+  const notes = el("textarea", { id: "notes", placeholder: "Why this grade (optional)" });
+  notes.value = g.notes || "";
+  notes.addEventListener("input", () => { g.notes = notes.value; markDirty(); });
+
+  d.append(el("div", { class: "card grade" },
+    el("h2", { text: `Your grade · ${q.id}` }),
+    el("div", { class: "row" },
+      el("div", {},
+        el("label", { class: "h", text: "Is the answer correct?" }),
+        el("div", { class: "seg", role: "group", "aria-label": "Answer correct" },
+          segBtn("Correct", true, "correct", g.answer_correct, setAnswer),
+          segBtn("Partial", "partial", "partial", g.answer_correct, setAnswer),
+          segBtn("Incorrect", false, "incorrect", g.answer_correct, setAnswer)),
+        el("div", { class: "help", text: isGate(q) ? "Judge the prose against the expected answer." : "For a behaviour case, judge whether it behaved as expected (refused, corrected the premise, invented nothing)." })),
+      el("div", {},
+        el("label", { class: "h", text: "Citation (overrides the automatic check)" }),
+        el("div", { class: "seg", role: "group", "aria-label": "Citation override" },
+          segBtn("Use automatic", null, "neutral", g.citation_acceptable, setCitation),
+          segBtn("Accept", true, "correct", g.citation_acceptable, setCitation),
+          segBtn("Reject", false, "incorrect", g.citation_acceptable, setCitation)),
+        el("div", { class: "help", text: `Automatic: ${a.expected_chunk_cited ? "the expected passage was cited" : "the expected passage was not cited"}. Accept when another passage genuinely supports the answer; reject when a cited passage does not.` }))),
+    el("div", { style: "margin-top:12px" }, el("label", { class: "h", for: "notes", text: "Notes" }), notes),
+    el("div", { style: "display:flex;gap:8px;margin-top:10px;flex-wrap:wrap" },
+      el("button", { class: "btn", type: "button", text: "← Previous", onclick: () => step(-1) }),
+      el("button", { class: "btn", type: "button", text: "Next →", onclick: () => step(1) }),
+      el("div", { class: "spacer" }),
+      el("button", { class: "btn primary", type: "button", text: "Save grades", onclick: save }))));
+
+
+  /* Expected passages and how quotes were adjusted */
+  const passages = el("details", { class: "card" }, el("summary", { text: "Expected passages, quote adjustments and your original row" }));
+  const quotes = [e.quote, ...(e.also_required || [])].filter(Boolean);
+  quotes.forEach((qt, i) => passages.append(el("div", { class: "muted", style: "font-size:12px", text: i === 0 ? "Expected quote" : "Also required" }), el("div", { class: "quote", text: qt })));
+  (e.also_acceptable || []).forEach((qt) => passages.append(el("div", { class: "muted", style: "font-size:12px", text: "Also acceptable" }), el("div", { class: "quote", text: qt })));
+  (e.distractor_quotes || []).forEach((qt) => passages.append(el("div", { class: "muted", style: "font-size:12px", text: "Trap (should not be the answer)" }), el("div", { class: "quote", style: "border-left-color:var(--bad)", text: qt })));
+  (e.quote_adjustments || []).forEach((adj) => passages.append(el("div", { class: "adjust" },
+    el("b", { text: `Adjusted ${adj.field}: ` }), adj.reason,
+    el("div", { class: "muted", style: "margin-top:4px" }, "Original: ", el("span", { text: adj.original })))));
+  (e.facts_lost_in_extraction || []).forEach((f) => passages.append(el("div", { class: "adjust", text: `Key fact lost in PDF extraction, still required: ${f}` })));
+  (e.resolution_notes || []).forEach((n) => passages.append(el("div", { class: "adjust", text: n })));
+  if (q.notes) passages.append(el("h3", { text: "Your notes on this question" }), el("div", { class: "excerpt", text: q.notes }));
+  if (q.source) {
+    const kv = el("dl", { class: "kv" });
+    for (const [k, v] of Object.entries(q.source)) kv.append(el("dt", { text: k }), el("dd", { text: v === null ? "—" : String(v) }));
+    passages.append(el("h3", { text: "Original spreadsheet row" }), kv);
+  }
+  d.append(passages);
+
+  /* Retrieved passages */
+  if ((r.retrieved || []).length) {
+    const ret = el("details", { class: "card" }, el("summary", { text: `Retrieved passages (${r.retrieved.length})` }));
+    for (const c of r.retrieved) ret.append(el("div", { class: "citation" + (expectedIds.has(c.chunk_id) ? " hit" : "") },
+      el("div", { class: "badges" }, badge("rank " + c.rank), badge(c.file_name || ""), c.rerank_score !== null && c.rerank_score !== undefined ? badge("rerank " + c.rerank_score) : badge("not reranked", "flag"),
+        expectedIds.has(c.chunk_id) ? badge("expected passage", "good") : null),
+      el("div", { class: "excerpt", text: c.excerpt || "" })));
+    d.append(ret);
+  }
+
+  if (state.activeCitation) {
+    const target = document.getElementById("cite-" + state.activeCitation.replace(":", "-"));
+    if (target) target.scrollIntoView({ block: "center", behavior: "smooth" });
+  } else if (!keepScroll) {
+    $("main").scrollTop = 0;
+  }
+}
+
+function step(delta) {
+  const order = visibleQuestions().map((x) => x.i);
+  if (!order.length) return;
+  const at = order.indexOf(state.index);
+  const next = order[Math.min(order.length - 1, Math.max(0, (at === -1 ? 0 : at) + delta))];
+  state.index = next; state.activeCitation = null; renderList(); renderDetail();
+}
+
+/* ---------- Events ---------- */
+$("openBtn").addEventListener("click", openFile);
+$("openBtn2").addEventListener("click", openFile);
+$("saveBtn").addEventListener("click", save);
+$("fileInput").addEventListener("change", async (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  if (file) load(await file.text(), file.name, null);
+  ev.target.value = "";
+});
+$("filter").addEventListener("change", (ev) => { state.filter = ev.target.value; renderList(); });
+
+const drop = $("drop");
+drop.addEventListener("dragover", (ev) => { ev.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", async (ev) => {
+  ev.preventDefault(); drop.classList.remove("over");
+  const item = ev.dataTransfer.items && ev.dataTransfer.items[0];
+  let handle = null;
+  if (item && item.getAsFileSystemHandle) { try { handle = await item.getAsFileSystemHandle(); } catch (e) { handle = null; } }
+  const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) load(await file.text(), file.name, handle && handle.kind === "file" ? handle : null);
+});
+
+document.addEventListener("keydown", (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "s") { ev.preventDefault(); save(); return; }
+  if (!state.data) return;
+  const typing = ev.target && (ev.target.tagName === "TEXTAREA" || ev.target.tagName === "INPUT" || ev.target.tagName === "SELECT");
+  if (typing) { if (ev.key === "Escape") ev.target.blur(); return; }
+  const g = state.data.questions[state.index].grading;
+  const set = (v) => { g.answer_correct = v; markDirty(); renderDetail(true); };
+  if (ev.key === "j") step(1);
+  else if (ev.key === "k") step(-1);
+  else if (ev.key === "1") set(true);
+  else if (ev.key === "2") set("partial");
+  else if (ev.key === "3") set(false);
+  else if (ev.key === "0") set(null);
+  else if (ev.key === "n") { ev.preventDefault(); const n = $("notes"); if (n) n.focus(); }
+});
+
+window.addEventListener("beforeunload", (ev) => { if (state.dirty) { ev.preventDefault(); ev.returnValue = ""; } });
+
+// Exposed for the offline test in tests (node): the same logic the page uses.
+if (typeof module !== "undefined") module.exports = { fold, factPresent, isGate, cited, gradeKey };
+</script>
+</body>
+</html>

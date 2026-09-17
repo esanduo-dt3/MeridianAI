@@ -1,0 +1,218 @@
+{
+  "mode": "full",
+  "gate_questions": 17,
+  "refusal_questions": 5,
+  "retrieval": {
+    "recall_at_1": {
+      "hits": 16,
+      "n": 16,
+      "rate": 1.0,
+      "ci95": [
+        0.806,
+        1.0
+      ]
+    },
+    "recall_at_3": {
+      "hits": 16,
+      "n": 16,
+      "rate": 1.0,
+      "ci95": [
+        0.806,
+        1.0
+      ]
+    },
+    "recall_at_5": {
+      "hits": 16,
+      "n": 16,
+      "rate": 1.0,
+      "ci95": [
+        0.806,
+        1.0
+      ]
+    },
+    "recall_any": {
+      "hits": 17,
+      "n": 17,
+      "rate": 1.0,
+      "ci95": [
+        0.816,
+        1.0
+      ]
+    },
+    "mrr": 1.0,
+    "rank_unknown": [
+      "U-01"
+    ]
+  },
+  "citations": {
+    "correct_passage_cited": {
+      "hits": 17,
+      "n": 17,
+      "rate": 1.0,
+      "ci95": [
+        0.816,
+        1.0
+      ]
+    },
+    "cited_first": {
+      "hits": 17,
+      "n": 17,
+      "rate": 1.0,
+      "ci95": [
+        0.816,
+        1.0
+      ]
+    },
+    "strict_precision_mean": 0.9118,
+    "mean_citations_per_answer": 1.29,
+    "overrides_on_review": 0
+  },
+  "key_facts": {
+    "questions_with_facts": 17,
+    "fully_covered": {
+      "hits": 16,
+      "n": 17,
+      "rate": 0.9412,
+      "ci95": [
+        0.73,
+        0.99
+      ]
+    },
+    "mean_coverage": 0.9853,
+    "incomplete": {
+      "U-02": [
+        "[REDACTED]"
+      ]
+    }
+  },
+  "answer_quality": {
+    "groundedness_passed": {
+      "hits": 17,
+      "n": 17,
+      "rate": 1.0,
+      "ci95": [
+        0.816,
+        1.0
+      ]
+    },
+    "ungrounded_answers_flagged": {
+      "hits": 0,
+      "n": 0,
+      "rate": null,
+      "ci95": [
+        0.0,
+        0.0
+      ]
+    },
+    "correct_refusals": {
+      "hits": 5,
+      "n": 5,
+      "rate": 1.0,
+      "ci95": [
+        0.566,
+        1.0
+      ]
+    },
+    "false_refusals": {
+      "hits": 0,
+      "n": 17,
+      "rate": 0.0,
+      "ci95": [
+        0.0,
+        0.184
+      ]
+    }
+  },
+  "human_grading": {
+    "graded": 0,
+    "ungraded": 17,
+    "correct": 0,
+    "partial": 0,
+    "incorrect": 0,
+    "answer_correct_rate": null,
+    "final_grade_counts": {}
+  },
+  "operational": {
+    "latency_p50_s": 10.067,
+    "latency_p95_s": 20.218,
+    "latency_max_s": 22.673,
+    "models": {
+      "gemini-3.5-flash": 14,
+      "gemini-3.5-flash-lite": 8
+    },
+    "answered_by_fallback": 8,
+    "retried_retrieval": 0,
+    "without_rerank": 1
+  },
+  "confidence": {
+    "truth_basis": "human grade where present, else citation",
+    "mean_when_right": 0.89,
+    "mean_when_wrong": null,
+    "n_right": 16,
+    "n_wrong": 0,
+    "missing_confidence": 1,
+    "can_validate_threshold": false
+  },
+  "by_kind": {
+    "cross_doc": {
+      "n": 6,
+      "cited": 6,
+      "rank_1": 6,
+      "facts_complete": 6,
+      "facts_n": 6
+    },
+    "table": {
+      "n": 2,
+      "cited": 2,
+      "rank_1": 2,
+      "facts_complete": 2,
+      "facts_n": 2
+    },
+    "single_passage": {
+      "n": 5,
+      "cited": 5,
+      "rank_1": 5,
+      "facts_complete": 5,
+      "facts_n": 5
+    },
+    "multi_hop": {
+      "n": 4,
+      "cited": 4,
+      "rank_1": 3,
+      "facts_complete": 3,
+      "facts_n": 4
+    }
+  },
+  "profiles_used": {
+    "lookup": 13,
+    "explore": 3,
+    "summarize": 1
+  },
+  "prd_targets": [
+    {
+      "target": "Gate G1: at least 12 of 15 golden questions cite the correct chunk",
+      "actual": "15 of 15",
+      "status": "pass"
+    },
+    {
+      "target": "Latency p50 under 8 seconds end to end",
+      "actual": "10.1s",
+      "status": "fail"
+    },
+    {
+      "target": "Every ungrounded answer is flagged, never shown as confident",
+      "actual": "0 of 0 ungrounded answers flagged",
+      "status": "not exercised"
+    },
+    {
+      "target": "Golden set labelled by hand, independently of the model under test",
+      "actual": "15 written by Claude after reading the corpus; 2 by the owner",
+      "status": "partial"
+    },
+    {
+      "target": "Injection red-team suite: 8 of 8 injection documents caught",
+      "actual": "not run",
+      "status": "not run"
+    }
+  ]
+}

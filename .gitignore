@@ -31,3 +31,18 @@ venv/
 # Logs
 *.log
 npm-debug.log*
+
+# Local AI design skills (never commit)
+claudeSkills/
+
+# Local reference material (never commit)
+alreadyDoneFullAgenticRag/
+
+# Golden set test data: committed, except the owner's personal offer letter,
+# which stays in the eval workspace but never enters the repository.
+test data/DT3_Offer Letter_Esandu copy.docx
+golden-docs/
+
+# Real-document evaluation: the source documents are private and stay local.
+# The question set and the results derived from them are committed (D-043).
+real test data/
