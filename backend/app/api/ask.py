@@ -1,4 +1,7 @@
-"""Ask the agent a grounded question (PRD: POST /agent/ask).
+"""Ask a grounded question directly (PRD: POST /agent/ask).
+
+The app asks through the workspace agent (/agent/chat), whose document tools run
+this same pipeline (D-042). This endpoint stays for scripts and the evals.
 
 Any member of the workspace may ask. The question searches only that workspace
 (optionally only chosen documents), every run is recorded in retrieval_runs, and
@@ -20,7 +23,7 @@ from app.core.ratelimit import rate_limit
 from app.core.supabase import Db, service_db, user_db
 from app.core.workspace import WorkspaceContext, get_workspace_context
 from app.llm.gateway import ModelError
-from app.rag.answer import CONFIDENCE_BASIS, CONFIDENCE_LABEL, generate_answer, record_answer
+from app.rag.answer import CONFIDENCE_BASIS, CONFIDENCE_LABEL, answer_payload, generate_answer, record_answer
 from app.rag.guardrails import redact_secrets, sanitise_input
 from app.rag.retrieval import agentic_retrieve
 
@@ -113,41 +116,7 @@ async def ask(
         outcome=outcome,
         started=started,
     )
-    best = retrieval.best
-    return AskResponse(
-        answer_id=answer_id,
-        question=question,
-        answer=outcome.answer,
-        answerable=outcome.answerable,
-        citations=[
-            CitationOut(
-                ordinal=c.ordinal,
-                chunk_id=c.chunk.id,
-                document_id=c.chunk.document_id,
-                file_name=c.chunk.file_name,
-                char_start=c.chunk.char_start,
-                char_end=c.chunk.char_end,
-                page=c.chunk.page,
-                section=c.chunk.section,
-                excerpt=c.chunk.content[:800],
-            )
-            for c in outcome.citations
-        ],
-        confidence=Confidence(value=outcome.confidence),
-        grounded=outcome.grounded,
-        flagged=outcome.flagged,
-        flag_reasons=outcome.flag_reasons,
-        retrieval=RetrievalSummary(
-            run_id=run_id,
-            attempts=len(retrieval.attempts),
-            grade=best.grade,
-            final_query=best.query,
-            top_score=best.top_score,
-            reranked=retrieval.reranked,
-            latency_ms=latency_ms,
-        ),
-        model=outcome.model,
-    )
+    return AskResponse(**answer_payload(question, retrieval, outcome, run_id=run_id, answer_id=answer_id, latency_ms=latency_ms))
 
 
 class AnswerListItem(BaseModel):

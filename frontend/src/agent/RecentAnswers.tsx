@@ -5,7 +5,7 @@ import type { AnswerListItem } from '../lib/types'
 import { ConfidenceReadout, FlaggedBadge, GroundednessBadge } from './AnswerSignals'
 import { AnswerText } from './AnswerText'
 import { flagReasonText } from './answerModel'
-import { useRecentAnswers } from './useAsk'
+import { useRecentAnswers } from './useRecentAnswers'
 
 const stamp = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
 

@@ -1,7 +1,8 @@
 """Talk to the workspace agent (docs/decisions.md D-028, D-039).
 
-Any member may ask. The agent reads tasks, members and documents as that member,
-and can only propose a task; an Admin approves or rejects the proposal on the
+Any member may ask. This is the one place to ask anything: the agent decides
+whether a message needs a tool, and which document tool fits a question (D-042).
+It reads tasks, members and documents as that member, and can only propose a task; an Admin approves or rejects the proposal on the
 Tasks page. Every turn is written to the audit log with the tools it used.
 
 The conversation is held by the client and sent back with each message, so the
@@ -52,7 +53,7 @@ class ChatResponse(BaseModel):
     steps: list[StepOut]
     proposals: list[dict[str, Any]]
     tasks: list[dict[str, Any]]
-    citations: list[dict[str, Any]]
+    answers: list[dict[str, Any]]
     injection_detected: bool
     models: list[str]
 
@@ -96,6 +97,7 @@ async def chat(
             "secrets_redacted": sorted(set(redacted_in + redacted_out)),
             "tools": [{"tool": s.tool, "arguments": s.arguments, "ok": s.ok} for s in result.steps],
             "proposal_ids": [p["id"] for p in state.proposals],
+            "answer_ids": [a["answer_id"] for a in state.answers],
             "injection_detected": state.tainted,
             "models": result.models,
         },
@@ -105,7 +107,7 @@ async def chat(
         steps=[StepOut(tool=s.tool, arguments=s.arguments, ok=s.ok, summary=s.summary) for s in result.steps],
         proposals=state.proposals,
         tasks=list(state.tasks.values()),
-        citations=state.citations,
+        answers=state.answers,
         injection_detected=state.tainted,
         models=result.models,
     )
