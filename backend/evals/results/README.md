@@ -34,8 +34,19 @@ Voyage key is capped at 10K tokens a minute. Decision D-043.
 | --- | --- |
 | `agent-run.json` | **The result, graded by the owner.** G1 12/15 (pass); answers correct 12/15, 1 partial, 2 incorrect; routing 20/20; p50 latency 20.2 s. |
 | `retrieval-only-no-rerank.json` | Retrieval-only baseline without reranking. Recall@1 10/15, @5 14/15. |
+| `report.html` | **Open this to present the results.** Built by `evals/present.py`. |
 
 Grade or re-grade `agent-run.json` with `backend/evals/grader.html`.
+
+`report.html` is a presentation page of this run, with the metrics, charts, every
+question and answer, and the red-team results. Rebuild it after re-grading or
+re-running, rather than editing it:
+
+```sh
+.venv/bin/python -m evals.report --results evals/results/2026-09-17_2_real-documents/agent-run.json --golden evals/golden-real.jsonl
+.venv/bin/python -m evals.present --results evals/results/2026-09-17_2_real-documents/agent-run.json \
+    --baseline evals/results/2026-09-17_2_real-documents/retrieval-only-no-rerank.json
+```
 
 ## 3. `2026-09-17_3_red-team/`
 
