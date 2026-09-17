@@ -6,7 +6,8 @@ for. Everything here is read-only.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 
 from app.core.supabase import Db
 from evals.golden import GoldenQuestion, QuoteMatch, find_quote
@@ -49,12 +50,15 @@ class Corpus:
         return sum(len(d.chunks) for d in self.ready)
 
     def find_document(self, name: str) -> Document | None:
-        """Match on the file name, then on a unique case-insensitive partial name."""
+        """Match on the exact file name, then ignoring case, spaces, underscores and hyphens, then a unique partial."""
         for document in self.documents:
             if document.file_name == name:
                 return document
-        lowered = name.casefold()
-        hits = [d for d in self.documents if lowered in d.file_name.casefold()]
+        wanted = _norm_name(name)
+        same = [d for d in self.documents if _norm_name(d.file_name) == wanted]
+        if len(same) == 1:
+            return same[0]
+        hits = [d for d in self.documents if wanted in _norm_name(d.file_name)]
         return hits[0] if len(hits) == 1 else None
 
     def chunk_by_id(self, chunk_id: str) -> Chunk | None:
@@ -128,6 +132,11 @@ async def _chunks(db: Db, document_id: str) -> list[Chunk]:
 # --- Resolving golden questions against the corpus -------------------------
 
 
+def _norm_name(name: str) -> str:
+    """'SLT_PowerProx_solution architecture.docx' and 'SLT PowerProx solution architecture.docx' are one file."""
+    return re.sub(r"[\s_\-]+", " ", name.casefold()).strip()
+
+
 @dataclass
 class Resolved:
     question: GoldenQuestion
@@ -135,77 +144,100 @@ class Resolved:
     expected_chunk_ids: list[str]
     expected_chunk_indexes: list[int]
     problem: str | None = None
+    # One group per passage the answer needs; each lists the chunks that hold it (D-043).
+    required_groups: list[list[str]] = field(default_factory=list)
+    distractor_chunk_ids: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
         return self.problem is None
 
 
+def _locate(documents: list[Document], quote: str) -> tuple[list[Chunk], list[str]]:
+    """Chunks holding the quote, and a warning for each match that crosses a passage boundary.
+
+    A quote wholly inside a passage resolves to that passage. A quote that
+    crosses a boundary resolves to every passage it overlaps: a person copying a
+    multi-sentence quote cannot see where the chunker split, and citing either
+    side is citing the evidence (D-043).
+    """
+    found: list[Chunk] = []
+    warnings: list[str] = []
+    for document in documents:
+        for match in find_quote(document.content_text, quote):
+            inside = [c for c in document.chunks if c.char_start <= match.char_start and match.char_end <= c.char_end]
+            if not inside:
+                inside = [c for c in document.chunks if c.char_start < match.char_end and match.char_start < c.char_end]
+                if inside:
+                    warnings.append(
+                        f"quote spans passages {', '.join(str(c.chunk_index) for c in inside)} of {document.file_name}; "
+                        "all of them count as correct"
+                    )
+            found.extend(c for c in inside if c not in found)
+    return found, warnings
+
+
 def resolve(corpus: Corpus, question: GoldenQuestion) -> Resolved:
     if not question.answerable:
         return Resolved(question=question, document=None, expected_chunk_ids=[], expected_chunk_indexes=[])
 
-    document = corpus.find_document(question.document) if question.document else None
-    if question.document and document is None:
-        names = ", ".join(d.file_name for d in corpus.documents) or "none"
-        return Resolved(question, None, [], [], f"no document matching {question.document!r}. Workspace has: {names}")
-    if document is not None and document.parsed_status != "ready":
-        return Resolved(question, document, [], [], f"{document.file_name} is {document.parsed_status}, not ready")
+    named: list[Document] = []
+    for name in question.documents:
+        document = corpus.find_document(name)
+        if document is None:
+            names = ", ".join(d.file_name for d in corpus.documents) or "none"
+            return Resolved(question, None, [], [], f"no document matching {name!r}. Workspace has: {names}")
+        if document.parsed_status != "ready":
+            return Resolved(question, document, [], [], f"{document.file_name} is {document.parsed_status}, not ready")
+        named.append(document)
 
-    named = [document] if document is not None else corpus.ready
-    quotes = [question.expected_quote, *question.also_acceptable]
+    scope = named or corpus.ready
+    first = named[0] if named else None
+    where = ", ".join(d.file_name for d in named) if named else "any ready document"
+    warnings: list[str] = []
+    groups: list[list[str]] = []
 
-    chunk_ids: list[str] = []
-    chunk_indexes: list[int] = []
-    straddled: list[str] = []
-    missing: list[str] = []
-
-    for position, quote in enumerate(quotes):
-        if not quote:
-            continue
-        # The expected quote is looked for in the document the question names.
-        # Alternates are looked for across the whole corpus: a fact stated in two
-        # documents is legitimately citable from either, and scoping them to the
-        # named document would mark a correct citation wrong.
-        searched = named if position == 0 else corpus.ready
-        hits: list[tuple[Document, QuoteMatch]] = []
-        for candidate in searched:
-            hits.extend((candidate, m) for m in find_quote(candidate.content_text, quote))
-        if not hits:
-            missing.append(quote)
-            continue
-        for candidate, match in hits:
-            containing = [
-                c for c in candidate.chunks if c.char_start <= match.char_start and match.char_end <= c.char_end
-            ]
-            if not containing:
-                straddled.append(quote)
-                continue
-            for chunk in containing:
-                if chunk.id not in chunk_ids:
-                    chunk_ids.append(chunk.id)
-                    chunk_indexes.append(chunk.chunk_index)
-
-    if question.expected_quote in missing:
-        where = document.file_name if document else "any ready document"
+    # The expected quote, with its acceptable alternatives, is the first required passage.
+    primary, notes = _locate(scope, question.expected_quote or "")
+    if not primary:
         return Resolved(
-            question,
-            document,
-            [],
-            [],
+            question, first, [], [],
             f"expected_quote was not found in {where}. Copy it verbatim from the document text "
             "(the Documents viewer shows the extracted text).",
         )
-    if not chunk_ids and straddled:
-        return Resolved(
-            question,
-            document,
-            [],
-            [],
-            "expected_quote spans a passage boundary and sits inside no single passage. Shorten it, or move it "
-            "to the sentence the answer really rests on.",
-        )
-    if not chunk_ids:
-        return Resolved(question, document, [], [], "expected_quote could not be resolved to a passage")
+    warnings.extend(notes)
+    group = list(primary)
+    for alternative in question.also_acceptable:
+        extra, notes = _locate(corpus.ready, alternative)
+        if not extra:
+            warnings.append(f"also_acceptable quote not found, ignored: {alternative[:70]!r}")
+        warnings.extend(notes)
+        group.extend(c for c in extra if c not in group)
+    groups.append([c.id for c in group])
+    every = list(group)
 
-    return Resolved(question, document, chunk_ids, chunk_indexes)
+    for required in question.also_required:
+        chunks, notes = _locate(scope, required)
+        if not chunks:
+            return Resolved(question, first, [], [], f"also_required quote was not found in {where}: {required[:70]!r}")
+        warnings.extend(notes)
+        groups.append([c.id for c in chunks])
+        every.extend(c for c in chunks if c not in every)
+
+    distractors: list[str] = []
+    for trap in question.distractor_quotes:
+        chunks, _ = _locate(corpus.ready, trap)
+        if not chunks:
+            warnings.append(f"distractor quote not found, ignored: {trap[:70]!r}")
+        distractors.extend(c.id for c in chunks if c.id not in distractors)
+
+    return Resolved(
+        question=question,
+        document=first,
+        expected_chunk_ids=[c.id for c in every],
+        expected_chunk_indexes=[c.chunk_index for c in every],
+        required_groups=groups,
+        distractor_chunk_ids=[d for d in distractors if all(d not in g for g in groups)],
+        warnings=warnings,
+    )

@@ -58,12 +58,16 @@ def _fold(text: str) -> str:
 
 
 def fact_present(answer: str, fact: str) -> bool:
-    """A key fact appears as a whole token run, so "5" does not match inside "15"."""
-    needle = _fold(fact)
-    if not needle:
-        return False
-    pattern = r"(?<![0-9a-z])" + re.escape(needle) + r"(?![0-9a-z])"
-    return re.search(pattern, _fold(answer)) is not None
+    """A key fact appears as a whole token run, so "5" does not match inside "15".
+
+    "51.3%|51%" lists alternatives: any one of them counts (D-043).
+    """
+    folded = _fold(answer)
+    for alternative in fact.split("|"):
+        needle = _fold(alternative)
+        if needle and re.search(r"(?<![0-9a-z])" + re.escape(needle) + r"(?![0-9a-z])", folded):
+            return True
+    return False
 
 
 def key_fact_coverage(answer: str, facts: list[str]) -> dict[str, Any]:
@@ -90,9 +94,12 @@ def _cited(record: dict) -> bool:
 def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] | None = None) -> dict[str, Any]:
     must_include = must_include or {}
     done = [r for r in records if "error" not in r]
-    gate = [r for r in done if r.get("answerable_expected", True)]
+    # G1 counts the questions marked as gate questions; answerable behaviour cases
+    # such as a false premise are reported separately (D-043).
+    gate = [r for r in done if r.get("gate", r.get("answerable_expected", True))]
     refusals = [r for r in done if not r.get("answerable_expected", True)]
-    full = run.get("mode", "full") == "full"
+    behaviour = [r for r in done if r not in gate]
+    full = run.get("mode", "full") in ("full", "agent")
     n = len(gate)
 
     # A rank is unknown when a passage was re-scored after a run that did not keep
@@ -138,7 +145,8 @@ def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] |
     for r in gate:
         facts = must_include.get(r["id"], [])
         if facts:
-            per_question[r["id"]] = key_fact_coverage(r["result"].get("answer", ""), facts)
+            shown = r["result"].get("answer", "") + "\n" + (r["result"].get("reply") or "")
+            per_question[r["id"]] = key_fact_coverage(shown, facts)
     covered = [v for v in per_question.values()]
     out["key_facts"] = {
         "questions_with_facts": len(covered),
@@ -219,14 +227,65 @@ def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] |
         profiles[r.get("profile", "?")] = profiles.get(r.get("profile", "?"), 0) + 1
     out["profiles_used"] = profiles
 
+    if run.get("mode") == "agent":
+        routed = [r for r in done if r["auto_score"].get("routing_ok") is not None]
+        tools_by_kind: dict[str, dict[str, int]] = {}
+        for r in done:
+            chosen = r["auto_score"].get("document_tool_chosen", "none")
+            tools_by_kind.setdefault(r.get("type_label") or r.get("kind", "?"), {}).setdefault(chosen, 0)
+            tools_by_kind[r.get("type_label") or r.get("kind", "?")][chosen] += 1
+        with_groups = [r for r in gate if r["auto_score"].get("required_groups")]
+        out["agent"] = {
+            "routing_accuracy": rate(sum(1 for r in routed if r["auto_score"]["routing_ok"]), len(routed)),
+            "routing_misses": {r["id"]: {"chose": r["auto_score"]["document_tool_chosen"], "expected": r.get("expected_tools")}
+                               for r in routed if not r["auto_score"]["routing_ok"]},
+            "tool_chosen_by_type": tools_by_kind,
+            "all_required_passages_cited": rate(sum(1 for r in with_groups if r["auto_score"].get("all_required_cited")), len(with_groups)),
+            "required_passage_groups_cited": rate(sum(r["auto_score"].get("required_groups_cited", 0) for r in with_groups),
+                                                  sum(r["auto_score"].get("required_groups", 0) for r in with_groups)),
+            "cited_a_trap_passage": [r["id"] for r in done if r["auto_score"].get("cited_distractor")],
+            "must_not_include_violations": {r["id"]: r["auto_score"]["must_not_include_violations"]
+                                            for r in done if r["auto_score"].get("must_not_include_violations")},
+            "questions_with_tool_errors": [r["id"] for r in done if r["result"].get("tool_errors")],
+            "document_answers_per_question": round(sum(len(r["result"].get("checked_answers", [])) for r in done) / len(done), 2) if done else None,
+            "answer_pipeline_latency_p50_s": percentile([ms / 1000 for r in done for ms in r["result"].get("answer_latency_ms", [])], 50),
+            "end_to_end_latency_p50_s": percentile([(r["result"].get("latency_ms") or 0) / 1000 for r in done], 50),
+            "end_to_end_latency_p95_s": percentile([(r["result"].get("latency_ms") or 0) / 1000 for r in done], 95),
+        }
+
+    # Each behaviour case, with the automatic signals a grader needs beside it.
+    out["behaviour_cases"] = [
+        {
+            "id": r["id"],
+            "type": r.get("type_label") or r.get("kind"),
+            "refused": r["auto_score"].get("refused"),
+            "refusal_correct": r["auto_score"].get("refusal_correct"),
+            "grounded": r["result"].get("grounded"),
+            "flagged": r["result"].get("flagged"),
+            "flag_reasons": r["result"].get("flag_reasons"),
+            "must_not_include_violations": r["auto_score"].get("must_not_include_violations", []),
+            "key_facts": key_fact_coverage(
+                r["result"].get("answer", "") + "\n" + (r["result"].get("reply") or ""), must_include.get(r["id"], [])
+            ) if must_include.get(r["id"]) else None,
+            "expected_behaviour": r["expected"].get("expected_answer"),
+        }
+        for r in behaviour
+    ]
+
     p50 = out["operational"]["latency_p50_s"]
     original = [r for r in gate if not r["id"].startswith("U-")][:G1_TOTAL]
+    strict = out.get("agent", {}).get("all_required_passages_cited")
     g1_hits = sum(1 for r in original if _cited(r))
     out["prd_targets"] = [
         {
             "target": f"Gate G1: at least {G1_REQUIRED} of {G1_TOTAL} golden questions cite the correct chunk",
             "actual": f"{g1_hits} of {len(original)}",
             "status": "pass" if len(original) == G1_TOTAL and g1_hits >= G1_REQUIRED else "not comparable",
+        },
+        {
+            "target": "Stricter than G1: every passage the answer needs is cited",
+            "actual": f"{strict['hits']} of {strict['n']}" if strict else "not measured in this mode",
+            "status": ("pass" if strict and strict["hits"] == strict["n"] else "partial") if strict else "not run",
         },
         {
             "target": f"Latency p50 under {LATENCY_P50_TARGET_S:g} seconds end to end",
@@ -241,8 +300,8 @@ def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] |
         },
         {
             "target": "Golden set labelled by hand, independently of the model under test",
-            "actual": "15 written by Claude after reading the corpus; 2 by the owner",
-            "status": "partial",
+            "actual": run.get("golden_authorship", "15 written by Claude after reading the corpus; 2 by the owner"),
+            "status": run.get("golden_authorship_status", "partial"),
         },
         {"target": f"Injection red-team suite: {RED_TEAM_TARGET}", "actual": "not run", "status": "not run"},
     ]

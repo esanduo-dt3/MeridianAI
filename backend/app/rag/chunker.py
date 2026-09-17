@@ -38,6 +38,7 @@ _DENSE_CHARS_PER_TOKEN = 3.0
 _SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
 _WORD = re.compile(r"\S+")
 _BLANK_LINES = re.compile(r"\n[ \t]*\n")
+_NEWLINE = re.compile(r"\n")
 
 # Below this a text chunk with nowhere to merge is page furniture, not content.
 HARD_FLOOR_TOKENS = 14
@@ -215,6 +216,22 @@ def _code_parts(doc: str, span: Span, max_tokens: int) -> list[Span]:
         cursor = match.end()
     if doc[cursor:end].strip():
         blocks.append((cursor, end))
+
+    # A block with no blank lines inside can still be too big: code extracted from a
+    # PDF has none. Split such a block on line boundaries instead (D-043).
+    lined: list[Span] = []
+    for block in blocks:
+        if estimate_tokens(doc[block[0]:block[1]], dense=True) <= max_tokens:
+            lined.append(block)
+            continue
+        line_start = block[0]
+        for match in _NEWLINE.finditer(doc, block[0], block[1]):
+            if doc[line_start:match.start()].strip():
+                lined.append((line_start, match.start()))
+            line_start = match.end()
+        if doc[line_start:block[1]].strip():
+            lined.append((line_start, block[1]))
+    blocks = lined
 
     parts: list[Span] = []
     group: list[Span] = []

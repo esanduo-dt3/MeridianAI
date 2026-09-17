@@ -22,6 +22,18 @@ from evals.metrics import fact_present
 DEFAULT_GOLDEN = Path(__file__).parent / "golden.jsonl"
 
 
+def _raw_field(path: Path, question_id: str, key: str) -> list[str]:
+    """A field the loader does not model, read straight from the golden file."""
+    import json
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip() and not line.startswith("//"):
+            row = json.loads(line)
+            if row.get("id") == question_id:
+                return [v for v in row.get(key, []) if isinstance(v, str)]
+    return []
+
+
 async def main() -> int:
     parser = argparse.ArgumentParser(description="Validate the golden set against the corpus.")
     parser.add_argument("--golden", type=Path, default=DEFAULT_GOLDEN)
@@ -52,20 +64,32 @@ async def main() -> int:
     for question in questions:
         resolved = corpus_mod.resolve(corpus, question)
         if not question.answerable:
-            say(f"  {question.id}  refusal question, no expected passage")
+            corpus_text = " ".join(d.content_text for d in corpus.ready)
+            leaked = [f for f in question.must_not_include if fact_present(corpus_text, f)]
+            say(f"  {question.id}  refusal case, no expected passage" + (f"  (note: {leaked} appear in the corpus)" if leaked else ""))
             continue
         if resolved.ok:
-            where = resolved.document.file_name if resolved.document else "corpus"
             passages = ", ".join(str(i) for i in resolved.expected_chunk_indexes)
-            say(f"  {question.id}  -> {where} passage {passages}")
-            # A key fact the source document does not contain can never be answered,
-            # so it is a dataset error, not a model failure.
-            source = resolved.document.content_text if resolved.document else " ".join(
-                d.content_text for d in corpus.ready)
-            absent = [f for f in question.must_include if not fact_present(source, f)]
+            groups = len(resolved.required_groups)
+            where = ", ".join(question.documents) if question.documents else "corpus"
+            say(f"  {question.id}  -> {groups} required passage group(s), passages {passages} ({where})")
+            for warning in resolved.warnings:
+                say(f"        note: {warning}")
+            # Facts are checked against every document the question names, since a
+            # cross-document answer draws its facts from several (D-043).
+            named = [corpus.find_document(n) for n in question.documents]
+            source = " ".join(d.content_text for d in named if d) or " ".join(d.content_text for d in corpus.ready)
+            lost = set(_raw_field(args.golden, question.id, "facts_lost_in_extraction"))
+            absent = [f for f in question.must_include if not fact_present(source, f) and f not in lost]
+            for fact in sorted(lost):
+                say(f"        note: key fact {fact!r} is recorded as lost in extraction; it stays required")
             if absent:
                 problems += 1
-                say(f"  {question.id}  PROBLEM: must_include not in {where}: {absent}")
+                say(f"  {question.id}  PROBLEM: must_include not in the source text: {absent}")
+            present = [f for f in question.must_not_include if fact_present(source, f)]
+            if present:
+                problems += 1
+                say(f"  {question.id}  PROBLEM: must_not_include terms DO appear in the source, so using them is not an error: {present}")
         else:
             problems += 1
             say(f"  {question.id}  PROBLEM: {resolved.problem}")

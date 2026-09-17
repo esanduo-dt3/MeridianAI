@@ -85,7 +85,13 @@ class _RateWindow:
 
     async def acquire(self, count: int, reserve: int = 0) -> None:
         limit = max(self.per_minute - reserve, 1)
-        while self._sent and self._used(self._clock()) + count > limit:
+        while True:
+            # _used() prunes expired entries, so the window may be empty once it
+            # returns. Checking emptiness only before pruning read an empty deque
+            # and crashed ingestion (D-043). An empty window always admits a batch.
+            used = self._used(self._clock())
+            if not self._sent or used + count <= limit:
+                break
             await self._sleep(60 - (self._clock() - self._sent[0][0]) + 0.5)
         self._sent.append((self._clock(), count))
 
@@ -284,9 +290,11 @@ class ModelGateway:
         keys = [_key("embed", model, task, dims, t) for t in texts]
         results: list[list[float] | None] = [self._embeddings.get(k) for k in keys]
         missing = [i for i, r in enumerate(results) if r is None]
-        batch_size = max(1, min(self._settings.embed_batch_size, self._embed_window.per_minute))
         # Documents leave headroom in the window so questions are not held up.
         reserve = min(10, self._embed_window.per_minute // 10) if task == "document" else 0
+        # A batch must fit inside its own limit; a 100-text batch against a 90-text
+        # document limit could only ever enter an empty window (D-043).
+        batch_size = max(1, min(self._settings.embed_batch_size, self._embed_window.per_minute - reserve))
         for start in range(0, len(missing), batch_size):
             batch = missing[start : start + batch_size]
             await self._embed_window.acquire(len(batch), reserve=reserve)

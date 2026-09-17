@@ -49,6 +49,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-040](#d-040) | Admin surfaces: atomic review decisions, a paged audit log, and pipeline health from recorded rows only | Accepted | Engineering | 2026-09-16 |
 | [D-041](#d-041) | Deployment guardrails: rate limits, secret redaction, security headers, upload hardening | Accepted | Owner | 2026-09-17 |
 | [D-042](#d-042) | One Assistant: the agent chooses when to consult documents and which document tool to use | Accepted | Owner | 2026-09-17 |
+| [D-043](#d-043) | Real-document evaluation end to end through the agent, and the ingestion defects it exposed | Accepted | Owner | 2026-09-17 |
 
 ---
 
@@ -630,3 +631,25 @@ Each of these closes a gap the UI or the guardrails need.
   - A document question is now rate-limited by the chat limit (10 a minute, 120 an hour) rather than the ask limit (6, 60), but costs up to twice as much per message ([D-041](#d-041)).
   - The person can no longer force a profile or restrict a question to chosen documents from the app.
 
+## D-043
+
+**Real-document evaluation end to end through the agent, and the ingestion defects it exposed**
+
+- **Context.** The owner wrote a 20-question golden set on 10 real documents (`RAG_Golden_Evaluation_Dataset.xlsx`): 15 gate questions across nine case types and 5 behaviour cases (unanswerable, false premise, groundedness trap, out of scope). Since [D-042](#d-042) the app answers through the agent, which chooses the document tool, and that routing had not been measured live.
+- **Decision.**
+  - **The harness gains an end-to-end agent mode** (`evals.run --agent`). Each question goes through `run_agent` as the app asks it; the runner records the tool chosen against the expected tools, every checked answer, the agent's reply and end-to-end latency, and observes each retrieval without changing product code so rank can be scored.
+  - **The golden format gains** several required passages per question (scored leniently, as G1 defines it, and strictly, every passage cited), distractor passages, must-not-include terms, key facts with alternatives (`51.3%|51%`), several documents per question, and a gate flag, so answerable behaviour cases stay out of G1.
+  - **Quote matching treats extraction formatting as formatting:** table pipes and `<br>` inside table cells count as spaces, zero-width characters are ignored, and `→` matches `->`. A quote that crosses a passage boundary accepts every passage it overlaps, with a warning, because a person copying a quote cannot see chunk boundaries.
+  - **The spreadsheet is converted without rewriting the owner's content.** Quotes are extracted programmatically. Where extracted text differs from the file, 8 quotes in 6 questions were trimmed to their verbatim extracted part, each stored with its original and reason; Q10's "47-49%" is recorded as lost in extraction and stays required.
+  - **Two ingestion defects found while ingesting were fixed first**, since both are general, not specific to the questions: the PDF parser emitted every monospaced line as its own code element, so an 86-page report with code listings became 2,112 passages of about 7 tokens, now 210; and oversized code blocks with no blank lines now split on line boundaries. Separately, the embedding rate window crashed with `IndexError` when pruning emptied it inside its own loop condition, and a document batch of 100 could never fit its 90-text limit; batches now fit the limit and an empty window admits a batch.
+- **Results** (`backend/evals/results/real-agent.json`). **Run without reranking, by the owner's choice:** the Voyage key has no payment method, so it is capped at 10K tokens per minute, and a single 20-passage rerank on these long passages exceeds it; 17 of 20 questions fell back to fusion order and have no confidence value. The results file carries this note.
+  - Gate G1: **13 of 15** cite a correct passage (pass); strictly, 12 of 15 cite every required passage. Recall@1 10/15, @5 15/15.
+  - Routing: the agent chose an acceptable tool for **20 of 20**.
+  - Key facts complete for 11 of 15. Two false refusals (Q09 multi-passage, Q10 cross-document) where the passages were retrieved but the answer model said the documents do not contain the answer. Q13 answered only one of the two conflicting values; its groundedness check failed and it was flagged.
+  - Behaviour cases: both unanswerable questions and the out-of-scope question refused; the groundedness trap stated that no algorithm is specified and invented none; the false premise rejected 40% and gave 25%, but classified itself unanswerable and cited nothing.
+  - Latency: p50 **20.2 s** end to end against the 8 s target; 4 of 20 answers came from a fallback model after `503` errors.
+  - A no-rerank retrieval-only baseline (`real-retrieval.json`) is kept for comparison once reranking works.
+- **Consequences.**
+  - **Two-column PDFs are extracted in the wrong reading order** (GreenGuard), interleaving columns mid-sentence and in places mistaking columns for tables. **An en dash inside a number can be dropped** ("47–49%" became "4749%"). Both degrade answers and are not yet fixed.
+  - Every answer is ungraded; `answer_correct` is left for the owner.
+  - The measurement of the full designed pipeline, with reranking, needs a Voyage payment method.
