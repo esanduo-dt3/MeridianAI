@@ -229,7 +229,14 @@ def parse_pdf(data: bytes) -> ParsedDocument:
             keep = [l for l in page_lines[index] if _normalise(l.text) not in drop]
             flow = _reading_order([*keep, *page_tables[index]], doc[index].rect.width)
             buffer: list[str] = []
+            # Consecutive monospaced lines are one listing. Emitting each line as its
+            # own code element made every line of a listing its own passage: an
+            # 86-page report with code became 1,966 passages of about 7 tokens (D-043).
+            code_lines: list[str] = []
             for item in flow:
+                is_code = not isinstance(item, _Table) and not _is_heading(item, body) and item.mono and item.size <= body * 1.05
+                if not is_code:
+                    _flush_code(parsed, code_lines, page_no)
                 if isinstance(item, _Table):
                     _flush(parsed, buffer, page_no)
                     parsed.elements.append(table(item.markdown, page_no, rows=item.rows))
@@ -237,16 +244,24 @@ def parse_pdf(data: bytes) -> ParsedDocument:
                 elif _is_heading(item, body):
                     _flush(parsed, buffer, page_no)
                     parsed.elements.append(heading(item.text, levels.get(item.size, 2), page_no))
-                elif item.mono and item.size <= body * 1.05:
+                elif is_code:
                     _flush(parsed, buffer, page_no)
-                    parsed.elements.append(code(item.text, page_no))
+                    code_lines.append(item.text)
                 else:
                     buffer.append(item.text)
+            _flush_code(parsed, code_lines, page_no)
             _flush(parsed, buffer, page_no)
     finally:
         doc.close()
     parsed.bump("pages", parsed.page_count)
     return parsed
+
+
+def _flush_code(parsed: ParsedDocument, lines: list[str], page_no: int) -> None:
+    """Emit pending monospaced lines as one code block, keeping each line on its own line."""
+    if lines:
+        parsed.elements.append(code("\n".join(lines), page_no))
+        lines.clear()
 
 
 def _flush(parsed: ParsedDocument, buffer: list[str], page_no: int) -> None:

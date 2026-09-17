@@ -193,8 +193,10 @@ def test_document_embedding_is_paced_under_the_per_minute_quota():
 
     vectors = asyncio.run(_embed_gateway(Provider(), clock).embed([f"chunk {i}" for i in range(159)], "document"))
     assert len(vectors) == 159
-    # 100 texts go at once; the other 59 wait for the one-minute window to clear.
-    assert batches == [(0.0, 100), (60.5, 59)]
+    # Documents leave 10 of the 100 a minute free for questions (D-033), so 90 texts
+    # go at once and the other 69 wait for the window to clear. The old batch of
+    # 100 could not fit its own 90 limit, which is what crashed ingestion (D-043).
+    assert batches == [(0.0, 90), (60.5, 69)]
 
 
 def test_embedding_waits_as_long_as_a_quota_error_asks_then_succeeds():
@@ -227,3 +229,41 @@ def test_a_daily_embedding_quota_fails_fast_with_a_clear_type():
     with pytest.raises(QuotaExceeded) as caught:
         asyncio.run(_embed_gateway(Provider(), clock).embed(["a"], "document"))
     assert caught.value.daily and clock.slept == []
+
+
+@pytest.mark.anyio
+async def test_rate_window_admits_a_batch_when_its_history_expires_during_the_check():
+    """Regression (D-043): pruning emptied the window inside the loop condition, and
+    the wait then read the oldest entry of an empty deque and crashed ingestion."""
+    from app.llm.gateway import _RateWindow
+
+    now = [0.0]
+    slept: list[float] = []
+
+    async def sleep(seconds):
+        slept.append(seconds)
+        now[0] += seconds
+
+    window = _RateWindow(per_minute=100, clock=lambda: now[0], sleep=sleep)
+    await window.acquire(90, reserve=10)
+    now[0] += 61  # the first batch has aged out, but is still in the deque
+    await window.acquire(100, reserve=10)  # bigger than the 90 limit: must not crash
+    assert slept == []
+
+
+@pytest.mark.anyio
+async def test_rate_window_still_waits_when_the_minute_is_genuinely_full():
+    from app.llm.gateway import _RateWindow
+
+    now = [0.0]
+    slept: list[float] = []
+
+    async def sleep(seconds):
+        slept.append(seconds)
+        now[0] += seconds
+
+    window = _RateWindow(per_minute=100, clock=lambda: now[0], sleep=sleep)
+    await window.acquire(90, reserve=10)
+    now[0] += 10
+    await window.acquire(50, reserve=10)
+    assert slept and slept[0] == pytest.approx(50.5)
