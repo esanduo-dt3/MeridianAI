@@ -673,3 +673,20 @@ Each of these closes a gap the UI or the guardrails need.
   - **The defences stop instructions; they do not stop false facts.** Structural isolation and the scanner handle text that tries to command the agent, but a document that simply asserts a wrong value is, to the pipeline, a supported source. The groundedness check passed RT5, correctly: the claim *is* grounded in the passage. Detecting it would need conflict detection across passages or documents (the report states 25% elsewhere) or provenance on documents, which is not in Week 1 scope.
   - The regex scanner catches only explicit phrasing; guardrail 5 (scanning at upload), deferred by the owner until after this run, would surface the same 2 of 8 earlier, not more.
   - The poisoned documents stay local and uncommitted; the attack texts are recorded in `evals/redteam.jsonl` and the results file.
+
+## D-045
+
+**Deploy both services on Railway, not Vercel**
+
+- **Context.** Meridian needs a public deployment. Vercel's Hobby plan was considered first and rejected: it is for non-commercial personal use only, it caps request and response bodies at 4.5 MB (uploads accept 25 MB), and it runs the API as short-lived serverless functions, which does not suit ingestion started after the upload responds or the in-process rate limits, model pacing and caches, all of which assume one long-running process.
+- **Decision.**
+  - **Railway project `meridian` with two services**, `backend` and `frontend`, each deployed from its own folder with the Railway CLI (`railway up <folder> --path-as-root --service <name>`) and configured in that folder's `railway.json`. The backend's start command is in `backend/railpack.json`: the first deploy failed because Railpack, the builder, did not read it from `railway.json`.
+  - **Backend:** one uvicorn process started on `$PORT` behind Railway's proxy, health checked on `/health`, Python pinned to 3.13 by `.python-version`, `ENVIRONMENT=production`, `FRONTEND_ORIGIN` set to the frontend's Railway domain. A single instance, so in-process limits and pacing remain correct. `langchain-core` is now pinned in `requirements.txt`, which it was not, though it arrived transitively.
+  - **Frontend:** built by Railpack with `npm run build` and served as a static single-page app; Node pinned to 24 by `.nvmrc`. The `VITE_*` values are read at build time, so changing one needs a frontend redeploy.
+  - **Variables come from the local `.env` files** through `scripts/deploy/railway-variables.sh`, which passes each value on stdin and prints only names. `DATABASE_URL` is not sent: only the migration script uses it.
+  - **`.railwayignore` keeps the upload to what runs:** the backend excludes `evals/` (not needed at runtime, and some local results are unredacted), tests, the virtual environment and `.env`; the frontend excludes `node_modules`, `dist` and `.env`.
+- **Consequences.**
+  - The trial gives a one-time $5 credit for 30 days; the Free plan after it ($1 a month, 0.5 GB) will not keep two always-on services running, so a lasting deployment needs the Hobby plan ($5 a month).
+  - Sign-in redirects to the frontend's origin, so its Railway URL must be in Supabase Auth's allowed redirect URLs.
+  - Deploys are from the CLI for now; Railway can be connected to the GitHub repository later for deploys on push.
+  - The PyMuPDF licence (D-024) applies once the service is public.

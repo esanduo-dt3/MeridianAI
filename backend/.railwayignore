@@ -1,0 +1,10 @@
+# Kept out of the Railway upload. The server needs only app/ and requirements.txt.
+.venv/
+.env
+.env.*
+__pycache__/
+.pytest_cache/
+tests/
+# Evaluation data and results: not needed at runtime, and local copies of some
+# results are unredacted.
+evals/

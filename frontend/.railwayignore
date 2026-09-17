@@ -1,0 +1,5 @@
+# Kept out of the Railway upload; Railway installs and builds from source.
+node_modules/
+dist/
+.env
+.env.*
