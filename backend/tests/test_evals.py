@@ -118,12 +118,14 @@ def test_a_missing_quote_is_reported_rather_than_guessed(tmp_path):
     assert "not found" in resolved.problem
 
 
-def test_a_quote_straddling_a_passage_boundary_is_reported(tmp_path):
-    # Split the document mid-quote, so no single passage contains it.
+def test_a_quote_straddling_a_passage_boundary_accepts_both_passages_with_a_warning(tmp_path):
+    # Split the document mid-quote, so no single passage contains it. A person
+    # copying a quote cannot see chunk boundaries, so both sides count (D-043).
     boundary = TEXT.index("waits as long as") + 5
     resolved = corpus_mod.resolve(_corpus(boundary=boundary), _load_one(tmp_path, _question()))
-    assert not resolved.ok
-    assert "spans a passage boundary" in resolved.problem
+    assert resolved.ok
+    assert set(resolved.expected_chunk_ids) == {"c1", "c2"}
+    assert "spans passages 0, 1" in resolved.warnings[0]
 
 
 def test_an_unknown_document_name_lists_what_is_available(tmp_path):
@@ -249,3 +251,76 @@ def test_an_ungrounded_answer_that_was_not_flagged_fails_the_rule():
     m = metrics.compute({"mode": "full"}, [_full_record("G-01", grounded=False, flagged=False)])
     rule = next(t for t in m["prd_targets"] if "ungrounded" in t["target"])
     assert rule["status"] == "fail"
+
+
+def test_quotes_match_through_table_cell_line_breaks_and_zero_width_characters():
+    """Extracted table cells carry "<br>" and some documents carry invisible characters;
+    a person copying the same text sees neither (D-043)."""
+    text = "|**Task 1**<br>Collected a large dataset<br>from which a diverse<br>subset of at least 15,000|\nparameter\u200b store"
+    assert find_quote(text, "Collected a large dataset from which a diverse subset of at least 15,000")
+    assert find_quote(text, "parameter store")
+    match = find_quote(text, "subset of at least 15,000")[0]
+    assert text[match.char_start:match.char_end] == "subset of at least 15,000"
+
+
+def test_a_second_required_quote_makes_its_own_group(tmp_path):
+    question = _load_one(tmp_path, _question(also_required=["Unrelated closing section"]))
+    resolved = corpus_mod.resolve(_corpus(), question)
+    assert resolved.ok
+    assert resolved.required_groups == [["c1"], ["c2"]]
+
+
+def test_a_distractor_is_recorded_separately_from_the_answer(tmp_path):
+    question = _load_one(tmp_path, _question(distractor_quotes=["Unrelated closing section"]))
+    resolved = corpus_mod.resolve(_corpus(), question)
+    assert resolved.distractor_chunk_ids == ["c2"]
+    assert resolved.expected_chunk_ids == ["c1"]
+
+
+def test_document_names_match_despite_underscores_and_spaces(tmp_path):
+    corpus = _corpus()
+    corpus.documents[0].file_name = "SLT PowerProx solution architecture.docx"
+    assert corpus.find_document("SLT_PowerProx_solution_architecture.docx") is corpus.documents[0]
+
+
+def test_a_key_fact_accepts_any_listed_alternative():
+    assert metrics.fact_present("a 51% improvement", "51.3%|51%")
+    assert not metrics.fact_present("a 15% improvement", "51.3%|51%")
+
+
+def test_an_answerable_behaviour_case_is_left_out_of_the_gate(tmp_path):
+    question = _load_one(tmp_path, _question(gate=False))
+    assert question.answerable and not question.scored_for_gate
+
+
+@pytest.mark.anyio
+async def test_agent_mode_scores_routing_citations_traps_and_must_not_terms(monkeypatch, tmp_path):
+    """The whole evals.run agent path, with a scripted model and faked retrieval (D-043)."""
+    from app.agent import loop as loop_module
+    from evals import run as run_module
+    from tests.test_agent import FakeDb, ScriptedGateway, _chunk, _script_documents, call, make_ctx, respond
+
+    chunk = _chunk("The CNN model reached 94% accuracy.")
+    answer_gateway = ScriptedGateway([
+        {"answerable": True, "sentences": [{"text": "It reached 94% accuracy, not AES.", "sources": [1]}]},
+        {"grounded": True, "unsupported": []},
+    ])
+    _script_documents(monkeypatch, chunk, answer_gateway)
+    agent_gateway = ScriptedGateway([call("lookup_fact", question="How accurate is the CNN?"), respond("See below.")])
+    monkeypatch.setattr(loop_module, "get_gateway", lambda: agent_gateway)
+
+    question = _load_one(tmp_path, _question(id="Q01", question="How accurate is the CNN?", expected_tools=["lookup_fact"],
+                                             must_not_include=["AES"]))
+    expected = corpus_mod.Resolved(question=question, document=None, expected_chunk_ids=["c1"], expected_chunk_indexes=[0],
+                                   required_groups=[["c1"], ["c9"]], distractor_chunk_ids=[])
+    db = FakeDb()
+    record = await run_module._agent(db, make_ctx("x").workspace, question, expected, answer_model="fake-model")
+
+    score = record["auto_score"]
+    assert score["document_tool_chosen"] == "lookup_fact" and score["routing_ok"] is True
+    assert score["expected_chunk_retrieved"] and score["rank_of_expected"] == 1
+    assert score["expected_chunk_cited"] is True
+    assert score["required_groups_cited"] == 1 and score["all_required_cited"] is False
+    assert score["must_not_include_violations"] == ["AES"]
+    assert record["result"]["checked_answers"][0]["citations"][0]["chunk_id"] == "c1"
+    assert record["result"]["latency_ms"] >= 0 and record["grading"]["answer_correct"] is None

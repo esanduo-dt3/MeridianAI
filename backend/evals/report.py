@@ -115,6 +115,31 @@ def _print_extended(m: dict) -> None:
         facts = f"{v['facts_complete']}/{v['facts_n']}" if v["facts_n"] else "-"
         say(f"  {kind:<20} {v['n']:>3} {v['cited']:>6} {v['rank_1']:>7}  {facts:>14}")
     say(f"Profiles used  {m['profiles_used']}")
+    if "agent" in m:
+        a = m["agent"]
+        say()
+        say("Agent (end to end, as the app asks)")
+        say(f"  Chose an expected tool        {_pct_ci(a['routing_accuracy'])}")
+        for qid, miss in a["routing_misses"].items():
+            say(f"    {qid} chose {miss['chose']}, expected {miss['expected']}")
+        say(f"  Every required passage cited  {_pct_ci(a['all_required_passages_cited'])}")
+        say(f"  Required passages cited       {_pct_ci(a['required_passage_groups_cited'])}")
+        say(f"  Cited a trap passage          {a['cited_a_trap_passage'] or 'none'}")
+        say(f"  Must-not-include violations   {a['must_not_include_violations'] or 'none'}")
+        say(f"  Tool errors                   {a['questions_with_tool_errors'] or 'none'}")
+        say(f"  Document answers per question {a['document_answers_per_question']}")
+        say(f"  Latency p50 answer pipeline   {a['answer_pipeline_latency_p50_s']}s")
+        say(f"  Latency p50 / p95 end to end  {a['end_to_end_latency_p50_s']}s / {a['end_to_end_latency_p95_s']}s")
+        say("  Tool chosen by question type:")
+        for kind, tools in a["tool_chosen_by_type"].items():
+            say(f"    {kind:<30} {tools}")
+    if m.get("behaviour_cases"):
+        say()
+        say("Behaviour cases (not in G1)")
+        for b in m["behaviour_cases"]:
+            facts = "" if not b["key_facts"] else f" facts {b['key_facts']['present']}/{b['key_facts']['facts']}"
+            say(f"  {b['id']} {b['type']:<22} refused={b['refused']} grounded={b['grounded']} flagged={b['flagged']}"
+                f"{facts} must-not={b['must_not_include_violations'] or 'none'}")
     say()
     say("PRD evaluation targets")
     for t in m["prd_targets"]:
@@ -126,7 +151,7 @@ def _print_extended(m: dict) -> None:
 
 
 def _print_metrics(run: dict, records: list[dict], mode: str) -> None:
-    gate = [r for r in records if r.get("answerable_expected", True) and "error" not in r]
+    gate = [r for r in records if r.get("gate", r.get("answerable_expected", True)) and "error" not in r]
     refusals = [r for r in records if not r.get("answerable_expected", True) and "error" not in r]
     errors = [r for r in records if "error" in r]
 
@@ -143,7 +168,7 @@ def _print_metrics(run: dict, records: list[dict], mode: str) -> None:
     say(f"  Mean reciprocal rank         {_mean(gate, lambda r: r['auto_score'].get('reciprocal_rank')):.3f}")
     say()
 
-    if mode != "full":
+    if mode not in ("full", "agent"):
         say("Retrieval-only run: no answers were generated, so G1 is not scored here.")
         say("If the retrieved rate above is poor, fix retrieval before spending generation quota.")
         return
