@@ -49,12 +49,13 @@ Errors return `{"detail": "<message>"}`.
 | `POST /notes` | Workspace | Any | Body `{title?, content?}`; content must be a `doc` block tree ([D-029](../decisions.md#d-029)). Starts with an empty paragraph |
 | `PATCH /notes/{id}` | Workspace | Any | Body `{title?, content?}`. 422 for flat or invalid content |
 | `DELETE /notes/{id}` | Workspace | Author or Admin | 404 when the note does not exist or the caller may not delete it |
-| `POST /agent/ask` | Workspace | Any | Body `{question, document_ids?, profile?}`. Returns the answer, citations, confidence, groundedness, flags and a retrieval summary (below) |
+| `POST /agent/chat` | Workspace | Any | Body `{message, history?}`. The Assistant: the agent picks its tools, including the document tools `lookup_fact`, `explore_documents` and `summarize_documents` ([D-042](../decisions.md#d-042)). Returns `{reply, steps, proposals, tasks, answers, injection_detected, models}`; each item in `answers` has the `POST /agent/ask` response shape. At most two document answers per message |
+| `POST /agent/ask` | Workspace | Any | Body `{question, document_ids?, profile?}`. Returns the answer, citations, confidence, groundedness, flags and a retrieval summary (below). Not used by the app since D-042; kept for scripts and the evals |
 | `GET /agent/answers` | Workspace | Any | The caller's 30 most recent answers in this workspace |
 
 "Workspace" scope means the request carries `X-Workspace-Id`, and the caller must be a member of that workspace. All handlers query the database as the caller, so row-level security applies ([D-018](../decisions.md#d-018)). Member changes, invites and renames are written to the audit log.
 
-### `POST /agent/ask` response
+### Checked answer (`POST /agent/ask` response, and each item of `answers` from `POST /agent/chat`)
 
 ```json
 {

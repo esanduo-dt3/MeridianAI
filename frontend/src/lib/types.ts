@@ -168,8 +168,6 @@ export interface Note extends NoteSummary {
   with its label, so the UI can never render a bare number as a probability.
 */
 
-export type RetrievalProfile = 'lookup' | 'explore' | 'summarize'
-
 export interface Confidence {
   /** Null when no cited passage carried a rerank score. */
   value: number | null
@@ -201,12 +199,7 @@ export interface RetrievalSummary {
   latency_ms: number
 }
 
-export interface AskRequest {
-  question: string
-  document_ids?: string[]
-  profile?: RetrievalProfile
-}
-
+/** One checked answer from the agent's document tools (lookup_fact, explore_documents, summarize_documents). */
 export interface AskResponse {
   answer_id: string
   question: string
@@ -274,7 +267,8 @@ export interface ChatResponse {
   steps: AgentStep[]
   proposals: AgentProposal[]
   tasks: AgentTaskRef[]
-  citations: Citation[]
+  /** Checked answers from document tools, in the order the agent asked for them. */
+  answers: AskResponse[]
   injection_detected: boolean
   models: string[]
 }

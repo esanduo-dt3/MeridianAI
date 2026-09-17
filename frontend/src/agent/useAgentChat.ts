@@ -21,6 +21,9 @@ export function useAgentChat() {
       if (response.proposals.length > 0) {
         void queryClient.invalidateQueries({ queryKey: wsKey(active?.id, 'tasks') })
       }
+      if (response.answers.length > 0) {
+        void queryClient.invalidateQueries({ queryKey: wsKey(active?.id, 'answers') })
+      }
     },
   })
 }

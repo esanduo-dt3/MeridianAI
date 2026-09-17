@@ -318,3 +318,44 @@ async def record_answer(
         },
     )
     return run["id"], answer["id"], latency_ms
+
+
+def answer_payload(
+    question: str, retrieval: RetrievalResult, outcome: AnswerOutcome, *, run_id: str, answer_id: str, latency_ms: int
+) -> dict:
+    """The checked answer as the API returns it, shared by /agent/ask and the agent's document tools."""
+    best = retrieval.best
+    return {
+        "answer_id": answer_id,
+        "question": question,
+        "answer": outcome.answer,
+        "answerable": outcome.answerable,
+        "citations": [
+            {
+                "ordinal": c.ordinal,
+                "chunk_id": c.chunk.id,
+                "document_id": c.chunk.document_id,
+                "file_name": c.chunk.file_name,
+                "char_start": c.chunk.char_start,
+                "char_end": c.chunk.char_end,
+                "page": c.chunk.page,
+                "section": c.chunk.section,
+                "excerpt": c.chunk.content[:800],
+            }
+            for c in outcome.citations
+        ],
+        "confidence": {"value": outcome.confidence, "label": CONFIDENCE_LABEL, "basis": CONFIDENCE_BASIS},
+        "grounded": outcome.grounded,
+        "flagged": outcome.flagged,
+        "flag_reasons": outcome.flag_reasons,
+        "retrieval": {
+            "run_id": run_id,
+            "attempts": len(retrieval.attempts),
+            "grade": best.grade,
+            "final_query": best.query,
+            "top_score": best.top_score,
+            "reranked": retrieval.reranked,
+            "latency_ms": latency_ms,
+        },
+        "model": outcome.model,
+    }

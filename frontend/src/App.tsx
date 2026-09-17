@@ -11,7 +11,6 @@ import { SignIn } from './routes/SignIn'
 import { AuditLogPage } from './routes/admin/AuditLogPage'
 import { PipelineHealthPage } from './routes/admin/PipelineHealthPage'
 import { ReviewQueuePage } from './routes/admin/ReviewQueuePage'
-import { AskPage } from './routes/AskPage'
 import { AssistantPage } from './routes/AssistantPage'
 import { NotesPage } from './routes/NotesPage'
 import { DocumentsPage } from './routes/DocumentsPage'
@@ -54,7 +53,7 @@ export default function App() {
                   <Route element={<RequireWorkspace />}>
                     <Route element={<AppShell />}>
                       <Route index element={<Navigate to="/tasks" replace />} />
-                      <Route path="ask" element={<AskPage />} />
+                      <Route path="ask" element={<Navigate to="/assistant" replace />} />
                       <Route path="assistant" element={<AssistantPage />} />
                       <Route path="notes" element={<NotesPage />} />
                       <Route path="notes/:noteId" element={<NotesPage />} />

@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
+  BookOpenText,
   CheckCircle,
   CircleNotch,
   Clock,
+  ListMagnifyingGlass,
   MagnifyingGlass,
   PaperPlaneTilt,
   Robot,
@@ -13,10 +15,13 @@ import {
   WarningCircle,
   type Icon,
 } from '@phosphor-icons/react'
+import { AnswerPanel } from '../agent/AnswerPanel'
 import { AnswerText } from '../agent/AnswerText'
+import { RecentAnswers } from '../agent/RecentAnswers'
 import { useAgentChat } from '../agent/useAgentChat'
 import { Button } from '../components/Button'
 import { PageHeader } from '../components/PageHeader'
+import { ReliabilityNote } from '../components/ReliabilityNote'
 import { errorText } from '../lib/queryClient'
 import type { AgentProposal, AgentStep, ChatResponse, ChatTurn } from '../lib/types'
 import { PriorityIcon } from '../tasks/TaskBits'
@@ -25,7 +30,11 @@ import { useWorkspace } from '../workspace/WorkspaceProvider'
 
 const MAX_MESSAGE_CHARS = 2000
 
-const SUGGESTIONS = ['What do I have to do?', 'What is overdue in this workspace?', 'Which tasks are unassigned?']
+const SUGGESTIONS = [
+  'What do I have to do?',
+  'What is overdue in this workspace?',
+  'Summarise the documents in this workspace',
+]
 
 interface Message {
   id: number
@@ -36,9 +45,11 @@ interface Message {
 }
 
 /**
- * Talk to the workspace agent (D-028, D-039). It reads tasks, members and
- * documents as the person asking, and can only propose a task: an Admin
- * approves or rejects proposals on the Tasks page.
+ * The one place to ask anything about the workspace (D-028, D-039, D-042). The
+ * agent decides whether a message needs a tool and which: task tools, or one of
+ * three document tools whose answers are cited, groundedness-checked and scored.
+ * It can only propose a task: an Admin approves or rejects proposals on the
+ * Tasks page.
  */
 export function AssistantPage() {
   const { active } = useWorkspace()
@@ -61,9 +72,7 @@ function Conversation() {
   function send(text: string) {
     const message = text.trim().slice(0, MAX_MESSAGE_CHARS)
     if (!message || chat.isPending) return
-    const history: ChatTurn[] = messages
-      .filter((m) => !m.failed)
-      .map((m) => ({ role: m.role, content: m.content }))
+    const history: ChatTurn[] = messages.filter((m) => !m.failed).map(historyTurn)
     setMessages((prev) => [...prev, { id: nextId.current++, role: 'user', content: message }])
     setDraft('')
     chat.mutate(
@@ -99,7 +108,7 @@ function Conversation() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Assistant"
-        description={`Ask about your work in ${active?.name ?? 'this workspace'}, or ask for a task. Tasks it suggests wait for an Admin to approve them.`}
+        description={`Ask about your work or the documents in ${active?.name ?? 'this workspace'}, or ask for a task. Document answers cite their passages; tasks it suggests wait for an Admin to approve them.`}
       />
 
       {messages.length === 0 ? (
@@ -108,8 +117,9 @@ function Conversation() {
             <Robot aria-hidden size={22} weight="duotone" />
           </span>
           <p className="max-w-[56ch] text-[15px] leading-relaxed text-ink-2">
-            It can list your tasks and what's overdue, open a task with its subtasks, find people to assign, search the
-            workspace documents, and propose new tasks. It sees only what you can see.
+            Ask in your own words. It works out what the question needs: your tasks and what's overdue, a specific
+            fact from the documents, a wider explanation, or a summary. It can also propose new tasks. It sees only
+            what you can see.
           </p>
           <div className="flex flex-wrap gap-2">
             {SUGGESTIONS.map((s) => (
@@ -125,7 +135,7 @@ function Conversation() {
           </div>
         </div>
       ) : (
-        <ol aria-label="Conversation" className="flex flex-col gap-4">
+        <ol aria-label="Conversation" className="flex flex-col gap-5">
           {messages.map((m) => (
             <li key={m.id}>{m.role === 'user' ? <UserBubble text={m.content} /> : <AssistantMessage message={m} />}</li>
           ))}
@@ -154,20 +164,34 @@ function Conversation() {
           className="w-full resize-none bg-transparent px-1 text-[15px] leading-relaxed text-ink placeholder:text-ink-3 focus:outline-none disabled:opacity-60"
         />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-ink-3">
-            Replies aren't groundedness-checked. For a checked answer from documents, use{' '}
-            <Link to="/ask" className="text-cobalt hover:underline">
-              Ask
-            </Link>
-            .
-          </p>
+          <ReliabilityNote compact />
           <Button type="submit" disabled={!draft.trim()} loading={chat.isPending} leading={<PaperPlaneTilt aria-hidden size={16} weight="bold" />}>
             Send
           </Button>
         </div>
       </form>
+
+      {messages.length === 0 && (
+        <section aria-labelledby="recent-answers" className="flex flex-col gap-3 border-t border-rule pt-8">
+          <h2 id="recent-answers" className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+            Your recent document answers
+          </h2>
+          <RecentAnswers />
+        </section>
+      )}
     </div>
   )
+}
+
+/*
+  The agent only sees what is sent back. A checked answer is shown under the
+  reply rather than inside it, so its text is added here to keep follow-up
+  questions ("and the second step?") answerable.
+*/
+function historyTurn(message: Message): ChatTurn {
+  const answers = message.response?.answers ?? []
+  const content = [message.content, ...answers.map((a) => `Checked answer to "${a.question}": ${a.answer}`)].join('\n\n')
+  return { role: message.role, content }
 }
 
 function UserBubble({ text }: { text: string }) {
@@ -189,7 +213,8 @@ function AssistantMessage({ message }: { message: Message }) {
     )
   }
   return (
-    <div className="flex max-w-full flex-col gap-2.5 sm:max-w-[85%]">
+    // A checked answer needs the full width for its passages; a plain reply reads like a chat bubble.
+    <div className={`flex max-w-full flex-col gap-2.5 ${response?.answers.length ? '' : 'sm:max-w-[85%]'}`}>
       {response && response.steps.length > 0 && (
         <ul aria-label="What the assistant did" className="flex flex-wrap gap-1.5">
           {response.steps.map((step, i) => (
@@ -205,12 +230,9 @@ function AssistantMessage({ message }: { message: Message }) {
         </p>
       )}
       <div className="rounded-(--radius-panel) border border-rule bg-surface px-4 py-3">
-        <AnswerText
-          text={message.content.replace(/\*\*(.+?)\*\*/g, '$1')}
-          citations={response?.citations}
-          className="text-[15px] leading-[1.7] text-ink"
-        />
+        <AnswerText text={message.content.replace(/\*\*(.+?)\*\*/g, '$1')} className="text-[15px] leading-[1.7] text-ink" />
       </div>
+      {response?.answers.map((answer) => <AnswerPanel key={answer.answer_id} result={answer} />)}
       {response?.proposals.map((p) => <ProposalCard key={p.id} proposal={p} />)}
     </div>
   )
@@ -223,7 +245,9 @@ const TOOL_LABEL: Record<string, (args: Record<string, unknown>) => { icon: Icon
   }),
   get_task: () => ({ icon: CheckCircle, text: 'Opened a task' }),
   list_members: () => ({ icon: UsersThree, text: 'Checked members' }),
-  search_workspace: (a) => ({ icon: MagnifyingGlass, text: `Searched documents for “${String(a.query ?? '')}”` }),
+  lookup_fact: () => ({ icon: MagnifyingGlass, text: 'Looked up a fact in the documents' }),
+  explore_documents: () => ({ icon: ListMagnifyingGlass, text: 'Explored the documents' }),
+  summarize_documents: () => ({ icon: BookOpenText, text: 'Summarised the documents' }),
   propose_task: () => ({ icon: Robot, text: 'Proposed a task' }),
 }
 

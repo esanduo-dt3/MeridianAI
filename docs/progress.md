@@ -6,6 +6,14 @@ Newest first. Each entry states what exists, the verification recorded when that
 
 `dev` is at `818206c` (`Merge feature/ask-page into dev`), which is **2 commits ahead of `origin/dev`**: the push was blocked locally and is still pending. The Ask page is merged; the golden-set eval harness is on `feature/golden-eval`, not merged. It carries the free-tier embedding pacing ([D-033](decisions.md#d-033)), the ingestion passage preview ([D-034](decisions.md#d-034)) and the Ask page ([D-035](decisions.md#d-035)) on top of the earlier retrieval, notes, documents, tasks and workspace work. The `main` branch remains at the initial repository baseline commit, `5766775`.
 
+## Day 3 (2026-09-17)
+
+### One Assistant with document tools (committed on `feature/unified-assistant`)
+
+- **Built.** The Ask page is merged into the Assistant ([D-042](decisions.md#d-042)). `/ask` redirects to `/assistant`. The agent decides whether a message needs a tool, and for document questions picks `lookup_fact`, `explore_documents` or `summarize_documents`, which replace `search_workspace`. Each runs the full checked pipeline and records the answer, and the Assistant page shows the checked answer with its passages, confidence and groundedness under the reply.
+- **Verified.** `pytest`: **134 passed**, including new agent tests for the three tools, answering with no tool, the per-message cap and the injection taint. Frontend `tsc`, `eslint` and `vite build` pass.
+- **Not yet verified.** A live run against Gemini to see how reliably the fast model chooses the right document tool, and the added latency.
+
 ## Gate status
 
 | Gate | Due | Status |

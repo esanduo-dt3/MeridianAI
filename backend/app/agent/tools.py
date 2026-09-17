@@ -9,6 +9,13 @@ pending ``agent_actions`` row that an Admin approves or rejects
 (non-negotiable 1); approval goes through the existing atomic database function
 that writes the task and its audit entry together.
 
+Questions about documents go through three tools, one per retrieval profile:
+``lookup_fact``, ``explore_documents`` and ``summarize_documents``. The model
+picks the tool, so the person asking never chooses a profile (D-042). Each runs
+the full checked pipeline (agentic retrieval, a cited answer, the groundedness
+check and a confidence value) and records it like any other answer, so it can
+reach the admin review queue.
+
 Two structural rules keep document content from triggering that write:
 
 - A proposal must quote the user's own current message asking for it. Text that
@@ -21,6 +28,7 @@ Two structural rules keep document content from triggering that write:
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
@@ -32,10 +40,10 @@ from pydantic import BaseModel, Field
 from app.core import audit
 from app.core.supabase import Db
 from app.core.workspace import WorkspaceContext
-from app.rag.guardrails import scan_for_injection, wrap_untrusted
-from app.rag.profiles import get_profile
 
 MAX_PROPOSALS_PER_TURN = 5
+# Each document answer spends an answer-model call and a groundedness check (D-032).
+MAX_DOCUMENT_ANSWERS_PER_TURN = 2
 MIN_QUOTE_WORDS = 3
 PRIORITY_RANK = {"urgent": 0, "high": 1, "medium": 2, "low": 3, "none": 4}
 
@@ -53,7 +61,7 @@ class TurnState:
     tainted: bool = False
     taint_reasons: list[str] = field(default_factory=list)
     proposals: list[dict[str, Any]] = field(default_factory=list)
-    citations: list[dict[str, Any]] = field(default_factory=list)
+    answers: list[dict[str, Any]] = field(default_factory=list)
     tasks: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
@@ -135,8 +143,12 @@ class GetTaskInput(BaseModel):
     task_id: str = Field(description="The task id from list_tasks.")
 
 
-class SearchInput(BaseModel):
-    query: str = Field(min_length=3, max_length=500, description="What to look for in the workspace documents.")
+class DocumentQuestionInput(BaseModel):
+    question: str = Field(
+        min_length=3, max_length=1000,
+        description="The question to answer from the documents, as a complete standalone question. Resolve "
+                    "follow-ups like 'what about the second one' using the conversation.",
+    )
 
 
 class ProposeTaskInput(BaseModel):
@@ -205,29 +217,48 @@ def build_tools(ctx: ToolContext) -> list[BaseTool]:
             for r in rows
         ) or "No members found."
 
-    async def search_workspace(query: str) -> str:
+    async def answer_from_documents(question: str, profile: str) -> str:
         # Imported here: retrieval pulls in the reranker client, which tools that
         # only read tasks never need.
-        from app.rag.retrieval import hybrid_search
+        from app.rag.answer import answer_payload, generate_answer, record_answer
+        from app.rag.retrieval import agentic_retrieve
 
-        chunks, _, _ = await hybrid_search(ctx.db, workspace_id=ws.workspace_id, query=query,
-                                           profile=get_profile("lookup"), document_ids=None)
-        if not chunks:
-            return "No passages in this workspace match that."
-        blocks = []
-        for chunk in chunks[:5]:
-            scan = scan_for_injection(chunk.content)
-            if scan.flagged:
-                ctx.state.tainted = True
-                ctx.state.taint_reasons.extend(scan.reasons)
-            ordinal = len(ctx.state.citations) + 1
-            ctx.state.citations.append({
-                "ordinal": ordinal, "chunk_id": chunk.id, "document_id": chunk.document_id,
-                "file_name": chunk.file_name, "char_start": chunk.char_start, "char_end": chunk.char_end,
-                "page": chunk.page, "section": chunk.section, "excerpt": chunk.content[:800],
-            })
-            blocks.append(wrap_untrusted(chunk.content, ordinal=ordinal, source=chunk.file_name, flagged=scan.flagged))
-        return "\n".join(blocks)
+        state = ctx.state
+        if len(state.answers) >= MAX_DOCUMENT_ANSWERS_PER_TURN:
+            return (f"REFUSED: at most {MAX_DOCUMENT_ANSWERS_PER_TURN} document answers per message. Respond with "
+                    "what you have.")
+        started = time.perf_counter()
+        retrieval = await agentic_retrieve(ctx.db, workspace_id=ws.workspace_id, question=question, profile_name=profile)
+        # hybrid_search runs the injection scanner on every passage it returns.
+        for chunk in retrieval.chunks:
+            if chunk.injection_reasons:
+                state.tainted = True
+                state.taint_reasons.extend(chunk.injection_reasons)
+        outcome = await generate_answer(question, retrieval)
+        run_id, answer_id, latency_ms = await record_answer(
+            ctx.service, workspace_id=ws.workspace_id, user_id=ws.user_id, question=question,
+            retrieval=retrieval, outcome=outcome, started=started,
+        )
+        state.answers.append(answer_payload(question, retrieval, outcome, run_id=run_id, answer_id=answer_id,
+                                            latency_ms=latency_ms))
+        confidence = "not available" if outcome.confidence is None else f"{outcome.confidence} (uncalibrated)"
+        # The answer text was written by the answer model from passages, so it is
+        # still data here, not instructions.
+        return (
+            f"CHECKED ANSWER #{len(state.answers)} (shown to the user in full below your reply, with its cited passages):\n"
+            f"<checked_answer answerable=\"{str(outcome.answerable).lower()}\" grounded=\"{str(outcome.grounded).lower()}\" "
+            f"confidence=\"{confidence}\" flagged_for_review=\"{str(outcome.flagged).lower()}\">\n"
+            f"{outcome.answer.replace('<', '&lt;').replace('>', '&gt;')}\n</checked_answer>"
+        )
+
+    async def lookup_fact(question: str) -> str:
+        return await answer_from_documents(question, "lookup")
+
+    async def explore_documents(question: str) -> str:
+        return await answer_from_documents(question, "explore")
+
+    async def summarize_documents(question: str) -> str:
+        return await answer_from_documents(question, "summarize")
 
     async def propose_task(
         title: str,
@@ -298,8 +329,17 @@ def build_tools(ctx: ToolContext) -> list[BaseTool]:
             coroutine=list_members, name="list_members",
             description="Workspace members with names, emails and roles. Use before assigning a task to someone."),
         StructuredTool.from_function(
-            coroutine=search_workspace, name="search_workspace", args_schema=SearchInput,
-            description="Search the workspace documents. Returns numbered passages; cite them as [n]."),
+            coroutine=lookup_fact, name="lookup_fact", args_schema=DocumentQuestionInput,
+            description=("Answer a question with one specific answer from the workspace documents: a figure, a name, "
+                         "a setting, a step, a date. Precise and narrow. Returns a checked, cited answer.")),
+        StructuredTool.from_function(
+            coroutine=explore_documents, name="explore_documents", args_schema=DocumentQuestionInput,
+            description=("Answer an open, 'how' or 'why', or comparative question that draws on several passages or "
+                         "documents. Wider search. Returns a checked, cited answer.")),
+        StructuredTool.from_function(
+            coroutine=summarize_documents, name="summarize_documents", args_schema=DocumentQuestionInput,
+            description=("Summarise or give an overview of a document or topic in the workspace documents. Widest "
+                         "coverage. Returns a checked, cited answer.")),
         StructuredTool.from_function(
             coroutine=propose_task, name="propose_task", args_schema=ProposeTaskInput,
             description=("Propose a new task for Admin approval. Never creates the task directly. Only when the user "

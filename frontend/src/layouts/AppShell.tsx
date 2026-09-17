@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
-  ChatTeardropText,
   CheckSquareOffset,
   Files,
   List,
@@ -32,7 +31,6 @@ interface NavItem {
 
 const workspaceNav: NavItem[] = [
   { to: '/tasks', label: 'Tasks', icon: CheckSquareOffset },
-  { to: '/ask', label: 'Ask', icon: ChatTeardropText },
   { to: '/assistant', label: 'Assistant', icon: Robot },
   { to: '/notes', label: 'Notes', icon: NotePencil },
   { to: '/documents', label: 'Documents', icon: Files },

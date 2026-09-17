@@ -41,13 +41,14 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-032](#d-032) | Run on the Gemini free tier with a model chain and cooldowns | Accepted | Owner | 2026-09-16 |
 | [D-033](#d-033) | Pace document embedding under the free-tier quota | Accepted | Engineering | 2026-09-16 |
 | [D-034](#d-034) | Preview passages before embedding finishes | Accepted | Owner | 2026-09-16 |
-| [D-035](#d-035) | The Ask page shows the whole reliability record of an answer | Accepted | Engineering | 2026-09-16 |
+| [D-035](#d-035) | The Ask page shows the whole reliability record of an answer | Accepted; page merged into the Assistant by D-042 | Engineering | 2026-09-16 |
 | [D-036](#d-036) | Golden set anchors on quotes, and the eval runs offline in two passes | Accepted | Engineering | 2026-09-16 |
 | [D-037](#d-037) | Persist the answering model, and record what the free Voyage tier costs retrieval | Accepted | Engineering | 2026-09-16 |
 | [D-038](#d-038) | Evaluation metrics beyond the gate, with intervals and objective key facts | Accepted | Engineering | 2026-09-16 |
 | [D-039](#d-039) | The workspace agent: LangChain tools, a JSON tool loop through the gateway, and proposals that need the user's own words | Accepted | Engineering | 2026-09-16 |
 | [D-040](#d-040) | Admin surfaces: atomic review decisions, a paged audit log, and pipeline health from recorded rows only | Accepted | Engineering | 2026-09-16 |
 | [D-041](#d-041) | Deployment guardrails: rate limits, secret redaction, security headers, upload hardening | Accepted | Owner | 2026-09-17 |
+| [D-042](#d-042) | One Assistant: the agent chooses when to consult documents and which document tool to use | Accepted | Owner | 2026-09-17 |
 
 ---
 
@@ -573,7 +574,7 @@ Each of these closes a gap the UI or the guardrails need.
 - **Consequences.**
   - Verified live on the E2E workspace: "What do I have to do?" returned exactly the member's four open tasks, overdue first; a workspace-wide overdue question matched the database; a task request produced a proposal, and approving it through `approve_agent_action` created the task with `source` agent and a two-entry audit trail, proposed by the agent then approved by the Admin. **Gate G2 passes.**
   - "Next Friday" on a Wednesday resolved to the Friday of the following week, not the same week. Reasonable, but worth knowing.
-  - Agent replies about documents are not groundedness-checked or confidence-scored; `/agent/ask` remains the checked path.
+  - Agent replies about documents are not groundedness-checked or confidence-scored; `/agent/ask` remains the checked path. *(Superseded by [D-042](#d-042): the agent's document tools now return checked answers.)*
   - The PRD's 8-document injection red-team suite still has to be run against this agent before Day 5.
 
 ## D-040
@@ -607,3 +608,25 @@ Each of these closes a gap the UI or the guardrails need.
   - Verified: 19 new tests (129 total), covering a zip bomb that compresses to a few kilobytes, a disguised file, a page cap, a passage cap, a pasted key that never reaches the model or the audit log, 429 with Retry-After, preflight headers and wildcard CORS refusal. Every real document on hand passes the upload checks, including the 6.8 MB PowerProx document, and a live server returned the headers and still refused unauthenticated requests with 401.
   - The frontend host must set its own security headers at deployment; these cover the API only.
   - Limits are conservative for the free Gemini tier and are settings, so they can be raised with a paid key.
+
+## D-042
+
+**One Assistant: the agent chooses when to consult documents and which document tool to use**
+
+- **Context.** There were two places to ask: the Ask page, where the person picked a retrieval profile (lookup, explore or summarize) and got a checked answer, and the Assistant, whose `search_workspace` tool returned raw passages and whose document replies were not checked ([D-039](#d-039)). The owner asked for one page and one agent that decides for itself whether a message needs retrieval and which kind, without the person choosing.
+- **Decision.**
+  - **The Ask page is removed.** `/ask` redirects to `/assistant`, and the navigation has one entry, Assistant. Recent document answers are listed on the Assistant page before a conversation starts.
+  - **`search_workspace` is replaced by three tools, one per retrieval profile:** `lookup_fact` (one specific fact), `explore_documents` (open, how/why or comparative questions) and `summarize_documents` (summaries and overviews). Their descriptions and the system prompt tell the model when each fits; greetings and task questions use no document tool. The profiles themselves are unchanged ([`profiles.py`](../backend/app/rag/profiles.py)).
+  - **Each document tool runs the full checked pipeline**, the same code as `POST /agent/ask`: agentic retrieval with grading and rewrite, a cited answer, the groundedness check and the uncalibrated confidence. It records `retrieval_runs`, `agent_answers` and `answer_citations`, so these answers reach the review queue and pipeline health like any other. `answer_payload` in `answer.py` builds the response for both paths.
+  - **The checked answer is shown in full under the agent's reply, not inside it.** The agent gets the answer text with its grounded, confidence and flag values, and is told not to restate it or add document facts, only to introduce it or connect it to tasks. This keeps what the person reads identical to what was checked. `POST /agent/chat` returns `answers` (a list shaped like the `/agent/ask` response) in place of `citations`; the audit entry records `answer_ids`.
+  - **At most two document answers per message**, because each spends an answer-model call and a groundedness check on the free tier ([D-032](#d-032)).
+  - The injection taint rule is unchanged: if any passage behind a document answer matched the scanner, proposals are refused for the rest of the turn.
+  - For follow-up questions, the browser adds each checked answer's text to the conversation history it sends back, since the agent only sees what is returned.
+  - `POST /agent/ask` stays as an API for scripts and the evals; the app no longer calls it.
+- **Why.** The person should not need to know how retrieval is tuned to ask a question. Routing is a job the tool-calling loop already does, and giving it one tool per profile makes the choice explicit, visible in the step chips, and testable. Running the checked pipeline inside the tool keeps non-negotiables 2 and 3 on the one remaining path.
+- **Consequences.**
+  - Verified: `pytest` **134 passed**, including new tests that each tool runs its own profile and records the answer, that a message can be answered with no tool, the per-message cap, and the injection taint through a document tool. Frontend typecheck, lint and build pass. Not yet checked live against Gemini: how reliably the fast model picks the right tool.
+  - Routing uses the fast model and one or two extra calls, so a document question through the Assistant is slower than the direct Ask path was. This adds to the p50 latency already over the 8-second target ([D-038](#d-038)).
+  - A document question is now rate-limited by the chat limit (10 a minute, 120 an hour) rather than the ask limit (6, 60), but costs up to twice as much per message ([D-041](#d-041)).
+  - The person can no longer force a profile or restrict a question to chosen documents from the app.
+

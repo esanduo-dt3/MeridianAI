@@ -31,7 +31,7 @@ These come from the build brief and are not relaxed under any circumstance.
 - Block-based note editor stored as a block tree
 - PDF and Word upload, chunked into a real `chunks` table
 - Hybrid retrieval: dense plus sparse search, rerank, grading, retry, groundedness self-check
-- Ask the agent, with clickable chunk-level citations and a labelled-uncalibrated confidence
+- Ask the Assistant anything in one place; it decides whether to consult the documents and how, and document answers carry clickable chunk-level citations and a labelled-uncalibrated confidence
 - Agent proposes a task from a note or conversation, held for approval, written with reasoning once approved
 - Full audit log; admin review queue for flagged answers and actions
 - Prompt-injection defence by structural isolation, proven against the red-team suite
