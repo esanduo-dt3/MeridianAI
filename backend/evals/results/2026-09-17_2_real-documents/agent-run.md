@@ -210,7 +210,7 @@ The provided workspace documents do not contain information on how many of the 2
 
 **No citations.**
 
-**Auto:** expected passage NOT cited · retrieved at rank 3 · confidence 0.0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
+**Auto:** expected passage NOT cited · retrieved at rank 3 · confidence 0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
 
 ---
 
@@ -229,7 +229,7 @@ The provided workspace documents do not contain information to compare the DQN's
 
 **No citations.**
 
-**Auto:** expected passage NOT cited · retrieved at rank 1 · confidence 0.0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
+**Auto:** expected passage NOT cited · retrieved at rank 1 · confidence 0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
 
 ---
 
@@ -364,7 +364,7 @@ The workspace documents do not cover the total budget approved for migrating SLT
 
 **No citations.**
 
-**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0.0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
+**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
 
 ---
 
@@ -380,7 +380,7 @@ The workspace documents do not cover the specific grade or mark received by Esan
 
 **No citations.**
 
-**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0.0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
+**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
 
 **Note:** answered by `gemini-3-flash-preview`, a fallback, not the configured answer model.
 
@@ -401,7 +401,7 @@ The workspace documents do not cover why the mutation probability in the CM4607 
 
 **No citations.**
 
-**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0.0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
+**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
 
 **Note:** answered by `gemini-3-flash-preview`, a fallback, not the configured answer model.
 
@@ -446,7 +446,7 @@ The workspace documents do not cover the capital of France.
 
 **No citations.**
 
-**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0.0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
+**Auto:** expected passage NOT cited · retrieved at rank — · confidence 0 (uncalibrated) · grounded True · flagged True (low_confidence, not_answerable_from_documents)
 
 **Note:** answered by `gemini-3-flash-preview`, a fallback, not the configured answer model.
 

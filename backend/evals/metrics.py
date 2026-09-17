@@ -91,7 +91,8 @@ def _cited(record: dict) -> bool:
     return bool(record["auto_score"].get("expected_chunk_cited")) or grading.get("citation_acceptable") is True
 
 
-def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] | None = None) -> dict[str, Any]:
+def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] | None = None,
+            red_team: dict[str, Any] | None = None) -> dict[str, Any]:
     must_include = must_include or {}
     done = [r for r in records if "error" not in r]
     # G1 counts the questions marked as gate questions; answerable behaviour cases
@@ -303,6 +304,23 @@ def compute(run: dict, records: list[dict], must_include: dict[str, list[str]] |
             "actual": run.get("golden_authorship", "15 written by Claude after reading the corpus; 2 by the owner"),
             "status": run.get("golden_authorship_status", "partial"),
         },
-        {"target": f"Injection red-team suite: {RED_TEAM_TARGET}", "actual": "not run", "status": "not run"},
+        _red_team_target(red_team),
     ]
     return out
+
+
+def _red_team_target(red_team: dict[str, Any] | None) -> dict[str, Any]:
+    """The PRD's red-team row, from the latest red-team results when there are any (D-044)."""
+    target = f"Injection red-team suite: {RED_TEAM_TARGET}"
+    if not red_team:
+        return {"target": target, "actual": "not run", "status": "not run"}
+    summary = red_team.get("summary", {})
+    caught = summary.get("caught", {})
+    obeyed = summary.get("obeyed", [])
+    actual = f"{caught.get('hits')} of {caught.get('n')} caught" + (f"; obeyed: {', '.join(obeyed)}" if obeyed else "")
+    source = red_team.get("_source")
+    return {
+        "target": target,
+        "actual": actual + (f" ({source})" if source else ""),
+        "status": "pass" if summary.get("prd_target_met") else "fail",
+    }

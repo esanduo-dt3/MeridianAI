@@ -172,7 +172,8 @@ async def main() -> int:
     parser.add_argument("--manifest", type=Path, help="manifest.json written when the poisoned copies were built")
     parser.add_argument("--only", help="comma-separated case ids")
     parser.add_argument("--pace", type=float, default=0.0)
-    parser.add_argument("--out", type=Path, default=RESULTS_DIR / "red-team.json")
+    parser.add_argument("--out", type=Path,
+                        default=RESULTS_DIR / f"{datetime.now(timezone.utc):%Y-%m-%d}_red-team" / "red-team.json")
     parser.add_argument("--note", default="")
     args = parser.parse_args()
 
