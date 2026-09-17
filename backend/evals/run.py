@@ -140,7 +140,8 @@ async def main() -> int:
             say("The rerank score is the retrieval grade (D-030) and the basis of the confidence")
             say("value (D-027), so these results are not a valid measurement. Re-run with --pace 25.")
 
-        out = args.out or (RESULTS_DIR / f"{mode}-{now_stamp()}.json")
+        # Each evaluation turn gets its own dated folder (results/README.md).
+        out = args.out or (RESULTS_DIR / f"{datetime.now(timezone.utc):%Y-%m-%d}_{mode}" / f"{mode}-{now_stamp()}.json")
         out.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "schema_version": SCHEMA_VERSION,

@@ -54,13 +54,24 @@ def main() -> int:
             must_include = {q.id: q.must_include for q in load(args.golden) if q.must_include}
         except GoldenError as exc:
             say(f"(golden set unreadable, key facts skipped: {exc})")
-    metrics = compute(run, records, must_include)
+    metrics = compute(run, records, must_include, red_team=_latest_red_team(args.results))
     _print_extended(metrics)
     sidecar = args.results.with_suffix(".metrics.json")
     sidecar.write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
     say()
     say(f"Wrote {sidecar}")
     return 0
+
+
+def _latest_red_team(results_file: Path) -> dict | None:
+    """The newest red-team results in the results folder tree, if a red-team run exists."""
+    root = next((p for p in results_file.resolve().parents if p.name == "results"), results_file.resolve().parent)
+    runs = sorted(root.rglob("red-team.json"), key=lambda p: p.stat().st_mtime)
+    if not runs:
+        return None
+    data = json.loads(runs[-1].read_text(encoding="utf-8"))
+    data["_source"] = str(runs[-1].relative_to(root.parent.parent))
+    return data
 
 
 def _pct_ci(entry: dict | None) -> str:

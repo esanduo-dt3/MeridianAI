@@ -28,12 +28,14 @@
     "embed_model": "gemini-embedding-001",
     "asked_as": "spowerprox@gmail.com",
     "finished_at": "2026-09-17T06:52:29.557402+00:00",
-    "pace_seconds": 20.0,
+    "pace_seconds": 20,
     "note": "Reranking was unavailable for every question: the Voyage key has no payment method, so it is capped at 10K tokens per minute, and a single rerank request on these documents exceeds that. Owner chose to run without reranking. Results measure the pipeline with fusion-order retrieval, no confidence values and fallback grading; they are not a measurement of the full pipeline as designed.",
     "questions_without_rerank": 17,
     "golden_authorship": "All 20 questions written by the owner before any model run (RAG_Golden_Evaluation_Dataset.xlsx). 8 quotes in 6 questions (Q01, Q04, Q08, Q10, Q11, Q19) were trimmed to the text as extracted, each recorded with its original under expected.quote_adjustments; Q10's '47-49%' is recorded as lost in extraction and stays required.",
     "golden_authorship_status": "pass",
-    "golden_source": "RAG_Golden_Evaluation_Dataset.xlsx"
+    "golden_source": "RAG_Golden_Evaluation_Dataset.xlsx",
+    "graded_with": "backend/evals/grader.html",
+    "last_graded_at": "2026-09-17T08:22:28.752Z"
   },
   "questions": [
     {
@@ -289,7 +291,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 4,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -303,7 +305,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -571,7 +573,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -806,7 +808,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -1034,7 +1036,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 5,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -1048,7 +1050,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -1269,7 +1271,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 5,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -1283,7 +1285,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -1519,7 +1521,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -1740,7 +1742,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 5,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -1754,7 +1756,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -2005,7 +2007,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 4,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -2019,7 +2021,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -2098,7 +2100,7 @@
             "answerable": false,
             "citations": [],
             "confidence": {
-              "value": 0.0,
+              "value": 0,
               "label": "uncalibrated",
               "basis": "Mean reranker relevance (0 to 1) of the cited passages, multiplied by 1.0 when the retrieval grade was good and 0.6 when it was weak. Uncalibrated: not a probability that the answer is correct."
             },
@@ -2122,9 +2124,9 @@
         ],
         "answerable": false,
         "citations": [],
-        "confidence": 0.0,
+        "confidence": 0,
         "confidences": [
-          0.0
+          0
         ],
         "confidence_label": "uncalibrated",
         "grounded": true,
@@ -2246,7 +2248,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": false,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -2340,7 +2342,7 @@
             "answerable": false,
             "citations": [],
             "confidence": {
-              "value": 0.0,
+              "value": 0,
               "label": "uncalibrated",
               "basis": "Mean reranker relevance (0 to 1) of the cited passages, multiplied by 1.0 when the retrieval grade was good and 0.6 when it was weak. Uncalibrated: not a probability that the answer is correct."
             },
@@ -2364,9 +2366,9 @@
         ],
         "answerable": false,
         "citations": [],
-        "confidence": 0.0,
+        "confidence": 0,
         "confidences": [
-          0.0
+          0
         ],
         "confidence_label": "uncalibrated",
         "grounded": true,
@@ -2464,7 +2466,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 4,
         "expected_chunk_cited": false,
         "cited_position_of_expected": null,
@@ -2478,7 +2480,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": false,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -2707,7 +2709,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 5,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -2721,7 +2723,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -2960,7 +2962,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -3197,7 +3199,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 5,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -3211,8 +3213,8 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
-        "citation_acceptable": null,
+        "answer_correct": "partial",
+        "citation_acceptable": false,
         "notes": ""
       }
     },
@@ -3460,7 +3462,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 4,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -3474,7 +3476,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -3696,7 +3698,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 5,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -3710,7 +3712,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -3770,7 +3772,7 @@
             "answerable": false,
             "citations": [],
             "confidence": {
-              "value": 0.0,
+              "value": 0,
               "label": "uncalibrated",
               "basis": "Mean reranker relevance (0 to 1) of the cited passages, multiplied by 1.0 when the retrieval grade was good and 0.6 when it was weak. Uncalibrated: not a probability that the answer is correct."
             },
@@ -3794,9 +3796,9 @@
         ],
         "answerable": false,
         "citations": [],
-        "confidence": 0.0,
+        "confidence": 0,
         "confidences": [
-          0.0
+          0
         ],
         "confidence_label": "uncalibrated",
         "grounded": true,
@@ -3904,7 +3906,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": false,
         "rank_of_expected": null,
-        "reciprocal_rank": 0.0,
+        "reciprocal_rank": 0,
         "retrieved_count": 5,
         "expected_chunk_cited": false,
         "cited_position_of_expected": null,
@@ -3918,7 +3920,7 @@
         "refusal_correct": true
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -3979,7 +3981,7 @@
             "answerable": false,
             "citations": [],
             "confidence": {
-              "value": 0.0,
+              "value": 0,
               "label": "uncalibrated",
               "basis": "Mean reranker relevance (0 to 1) of the cited passages, multiplied by 1.0 when the retrieval grade was good and 0.6 when it was weak. Uncalibrated: not a probability that the answer is correct."
             },
@@ -4003,9 +4005,9 @@
         ],
         "answerable": false,
         "citations": [],
-        "confidence": 0.0,
+        "confidence": 0,
         "confidences": [
-          0.0
+          0
         ],
         "confidence_label": "uncalibrated",
         "grounded": true,
@@ -4113,7 +4115,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": false,
         "rank_of_expected": null,
-        "reciprocal_rank": 0.0,
+        "reciprocal_rank": 0,
         "retrieved_count": 5,
         "expected_chunk_cited": false,
         "cited_position_of_expected": null,
@@ -4127,7 +4129,7 @@
         "refusal_correct": true
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -4197,7 +4199,7 @@
             "answerable": false,
             "citations": [],
             "confidence": {
-              "value": 0.0,
+              "value": 0,
               "label": "uncalibrated",
               "basis": "Mean reranker relevance (0 to 1) of the cited passages, multiplied by 1.0 when the retrieval grade was good and 0.6 when it was weak. Uncalibrated: not a probability that the answer is correct."
             },
@@ -4221,9 +4223,9 @@
         ],
         "answerable": false,
         "citations": [],
-        "confidence": 0.0,
+        "confidence": 0,
         "confidences": [
-          0.0
+          0
         ],
         "confidence_label": "uncalibrated",
         "grounded": true,
@@ -4311,7 +4313,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": false,
         "rank_of_expected": null,
-        "reciprocal_rank": 0.0,
+        "reciprocal_rank": 0,
         "retrieved_count": 3,
         "expected_chunk_cited": false,
         "cited_position_of_expected": null,
@@ -4325,7 +4327,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -4600,7 +4602,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": true,
         "rank_of_expected": 1,
-        "reciprocal_rank": 1.0,
+        "reciprocal_rank": 1,
         "retrieved_count": 6,
         "expected_chunk_cited": true,
         "cited_position_of_expected": 1,
@@ -4614,7 +4616,7 @@
         "refusal_correct": null
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
@@ -4675,7 +4677,7 @@
             "answerable": false,
             "citations": [],
             "confidence": {
-              "value": 0.0,
+              "value": 0,
               "label": "uncalibrated",
               "basis": "Mean reranker relevance (0 to 1) of the cited passages, multiplied by 1.0 when the retrieval grade was good and 0.6 when it was weak. Uncalibrated: not a probability that the answer is correct."
             },
@@ -4699,9 +4701,9 @@
         ],
         "answerable": false,
         "citations": [],
-        "confidence": 0.0,
+        "confidence": 0,
         "confidences": [
-          0.0
+          0
         ],
         "confidence_label": "uncalibrated",
         "grounded": true,
@@ -4809,7 +4811,7 @@
         "routing_ok": true,
         "expected_chunk_retrieved": false,
         "rank_of_expected": null,
-        "reciprocal_rank": 0.0,
+        "reciprocal_rank": 0,
         "retrieved_count": 5,
         "expected_chunk_cited": false,
         "cited_position_of_expected": null,
@@ -4823,7 +4825,7 @@
         "refusal_correct": true
       },
       "grading": {
-        "answer_correct": null,
+        "answer_correct": true,
         "citation_acceptable": null,
         "notes": ""
       }
