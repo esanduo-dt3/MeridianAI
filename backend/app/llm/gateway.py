@@ -241,8 +241,18 @@ class ClaudeBedrockProvider:
 
     RESPOND_TOOL = "respond"
 
-    def __init__(self, *, region: str, access_key_id: str | None, secret_access_key: str | None, timeout_seconds: float):
+    def __init__(
+        self,
+        *,
+        region: str,
+        access_key_id: str | None,
+        secret_access_key: str | None,
+        timeout_seconds: float,
+        sampling: bool = True,
+    ):
         from anthropic import AsyncAnthropicBedrock
+
+        self._sampling = sampling
 
         options: dict[str, Any] = {
             "aws_region": region,
@@ -262,10 +272,15 @@ class ClaudeBedrockProvider:
         request: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
-            "temperature": temperature,
             "system": system,
             "messages": [{"role": "user", "content": [{"type": "text", "text": part} for part in parts]}],
         }
+        # The SDK dropped temperature from messages.create() because the newest
+        # Claude models refuse sampling settings, so it goes in the request body
+        # instead. Sonnet 4 and Haiku 4.5 accept it, and the pipeline depends on
+        # it: grading and the groundedness check run at 0.0 to stay deterministic.
+        if self._sampling:
+            request["extra_body"] = {"temperature": temperature}
         if json_schema is not None:
             request["tools"] = [
                 {
@@ -463,5 +478,6 @@ def get_gateway() -> ModelGateway:
         access_key_id=settings.aws_access_key_id.get_secret_value() if settings.aws_access_key_id else None,
         secret_access_key=settings.aws_secret_access_key.get_secret_value() if settings.aws_secret_access_key else None,
         timeout_seconds=settings.llm_timeout_seconds,
+        sampling=settings.bedrock_sampling,
     )
     return ModelGateway(claude, gemini)

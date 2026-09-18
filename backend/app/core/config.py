@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     bedrock_answer_model: str = ""       # answer generation (Sonnet)
     bedrock_fast_model: str = ""         # grading, rewrite, groundedness, agent loop (Haiku)
     bedrock_fallback_models: str = ""    # comma separated, tried before the other role's model
+    # Sonnet 4 and Haiku 4.5 accept temperature, and the pipeline relies on it:
+    # grading and the groundedness check run at 0.0 so they are deterministic.
+    # Newer Claude models (Sonnet 5, Opus 5 and later) reject sampling settings
+    # with a 400, so set this false if the model ARNs are changed to those.
+    bedrock_sampling: bool = True
 
     # --- Embeddings, and generation when generation_provider is "gemini" (D-026) ---
     gemini_api_key: SecretStr | None = None

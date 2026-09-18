@@ -369,3 +369,30 @@ def test_claude_missing_structured_output_fails_so_the_chain_moves_on(monkeypatc
                 json_schema={"type": "object", "properties": {}},
             )
         )
+
+
+def test_claude_request_only_uses_parameters_the_sdk_accepts(monkeypatch):
+    """Guards against the SDK dropping a parameter we send.
+
+    The fake client takes any keyword, so a request built with an argument the
+    real SDK does not accept still passes every other test here and only fails
+    against Bedrock. `temperature` was removed from `messages.create()` and had
+    to move into the request body; this catches the next one at test time.
+    """
+    import inspect
+
+    from anthropic.resources.messages import AsyncMessages
+
+    from app.llm.gateway import ClaudeBedrockProvider
+
+    message = _Block(content=[_Block(type="text", text="ok")])
+    provider, sent = _claude_provider(monkeypatch, message)
+    asyncio.run(
+        provider.generate(model="arn:example", system="s", parts=["p"], max_tokens=32, temperature=0.2, json_schema=None)
+    )
+
+    accepted = set(inspect.signature(AsyncMessages.create).parameters)
+    sent_keys = {key for key in sent if not key.startswith("_")}
+    assert sent_keys <= accepted, f"not accepted by the SDK: {sorted(sent_keys - accepted)}"
+    # Sampling rides in the body, because the typed signature no longer takes it.
+    assert sent["extra_body"] == {"temperature": 0.2}

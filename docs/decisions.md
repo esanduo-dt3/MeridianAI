@@ -714,7 +714,9 @@ Each of these closes a gap the UI or the guardrails need.
   - The model chain still exists, but it now protects against transient Bedrock errors rather than daily quota exhaustion. Cooldowns and the response cache are unchanged.
   - `agent_answers.model` holds Claude labels from now on; rows written before this change keep their Gemini model names, and the pipeline health view groups by whatever was recorded.
   - The latency and quality figures in [D-038](#d-038) and [D-043](#d-043) were measured on Gemini and are **not** comparable with runs after this change. The golden set should be re-run on Claude before any latency or quality claim is repeated.
-  - Verified: `pytest` 157 passed, including new tests that a schema becomes a forced tool call, that document text never enters the system instruction on this provider, that a missing structured result fails so the chain moves on, and that ARNs shorten to readable labels. **Not yet verified live against Bedrock.**
+  - Verified: `pytest` 170 passed, including new tests that a schema becomes a forced tool call, that document text never enters the system instruction on this provider, that a missing structured result fails so the chain moves on, that ARNs shorten to readable labels, and that every parameter sent is one the installed SDK accepts.
+  - **Found when first run live (2026-09-18):** `anthropic` 1.6.0 has removed `temperature` from `messages.create()`, because the newest Claude models refuse sampling settings. Sonnet 4 and Haiku 4.5 still accept it, and the pipeline depends on it (grading and the groundedness check run at 0.0 to stay deterministic), so it is sent in the request body instead, behind `BEDROCK_SAMPLING` (default true; set it false if the model ARNs are changed to Sonnet 5 or Opus 5, which reject it).
+  - **Still blocked on AWS (2026-09-18):** the IAM user `meridian-bedrock-demo` authenticates, but has no `bedrock:InvokeModel` permission on any foundation model, through the inference profile or directly, so no live call has succeeded yet. The account owner has to attach that permission.
 
 ## D-047
 
