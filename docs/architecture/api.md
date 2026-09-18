@@ -73,7 +73,7 @@ Errors return `{"detail": "<message>"}`.
   "flag_reasons": [],
   "retrieval": { "run_id": "uuid", "attempts": 1, "grade": "good", "final_query": "...",
                  "top_score": 0.83, "reranked": true, "latency_ms": 2840 },
-  "model": "gemini-3.5-flash"
+  "model": "claude-sonnet-4"
 }
 ```
 

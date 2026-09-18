@@ -3,7 +3,14 @@ response cache; docs/decisions.md D-026).
 
 Everything that calls a model goes through `ModelGateway`, so the provider can be
 swapped in one place and every call gets the same caching, timeouts and error
-type. Gemini is the provider for Week 1.
+type.
+
+Two providers, because they are different jobs (D-046):
+
+- Generation (answers, grading, rewriting, groundedness, the agent loop) runs on
+  Claude on Amazon Bedrock.
+- Embedding stays on Gemini. Claude has no embedding model, and vectors from a
+  different model would not be comparable with the ones already stored.
 
 The response cache is in-process and keyed on the exact request, so repeating an
 identical question (demo pre-warming, a retry after a network blip) costs no model
@@ -132,12 +139,29 @@ def _normalise(vector: list[float]) -> list[float]:
     return [v / norm for v in vector]
 
 
-class Provider(Protocol):
+class GenerationProvider(Protocol):
     async def generate(
         self, *, model: str, system: str, parts: list[str], max_tokens: int, temperature: float, json_schema: dict | None
     ) -> str: ...
 
+
+class EmbeddingProvider(Protocol):
     async def embed(self, *, model: str, texts: list[str], task: EmbedTask, dimensions: int) -> list[list[float]]: ...
+
+
+# An inference-profile ARN is unreadable in the review queue and the health view,
+# so answers record a short label: "claude-sonnet-4", not the full ARN.
+_VERSION_SUFFIX = re.compile(r"-v\d+:\d+$")
+_DATED_SNAPSHOT = re.compile(r"-\d{8}$")
+_CLAUDE_NAME = re.compile(r"claude-[a-z0-9-]+$")
+
+
+def model_label(model: str) -> str:
+    """A short, readable name for a model id or inference-profile ARN."""
+    tail = model.rsplit("/", 1)[-1]
+    tail = _DATED_SNAPSHOT.sub("", _VERSION_SUFFIX.sub("", tail))
+    match = _CLAUDE_NAME.search(tail)
+    return match.group(0) if match else tail[:80]
 
 
 class GeminiProvider:
@@ -199,11 +223,87 @@ class GeminiProvider:
         return vectors
 
 
+class ClaudeBedrockProvider:
+    """Claude on Amazon Bedrock, through the Anthropic SDK's Bedrock client.
+
+    Models are named by inference-profile ARN, which is what the account was
+    given, so this uses the Bedrock InvokeModel client rather than the Mantle
+    one (that addresses models by short id instead).
+
+    Structured output works differently from Gemini: Claude has no JSON-schema
+    response mode, so a schema is offered as a single tool the model is required
+    to call, and the tool's validated input is returned as JSON text. Callers
+    keep the same contract either way, so nothing above the gateway changes.
+
+    Content isolation is unchanged: the system instruction is its own argument,
+    and the caller's parts become text blocks of one user turn.
+    """
+
+    RESPOND_TOOL = "respond"
+
+    def __init__(self, *, region: str, access_key_id: str | None, secret_access_key: str | None, timeout_seconds: float):
+        from anthropic import AsyncAnthropicBedrock
+
+        options: dict[str, Any] = {
+            "aws_region": region,
+            # The gateway enforces the real deadline; this only stops a hung socket.
+            "timeout": timeout_seconds * 4,
+            # The gateway walks its own model chain, so the SDK must not retry too.
+            "max_retries": 0,
+        }
+        if access_key_id and secret_access_key:
+            options["aws_access_key"] = access_key_id
+            options["aws_secret_key"] = secret_access_key
+        self._client = AsyncAnthropicBedrock(**options)
+
+    async def generate(
+        self, *, model: str, system: str, parts: list[str], max_tokens: int, temperature: float, json_schema: dict | None
+    ) -> str:
+        request: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "system": system,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": part} for part in parts]}],
+        }
+        if json_schema is not None:
+            request["tools"] = [
+                {
+                    "name": self.RESPOND_TOOL,
+                    "description": "Return your response in the required structure.",
+                    "input_schema": json_schema,
+                }
+            ]
+            request["tool_choice"] = {"type": "tool", "name": self.RESPOND_TOOL}
+
+        message = await self._client.messages.create(**request)
+
+        if json_schema is not None:
+            for block in message.content:
+                if getattr(block, "type", None) == "tool_use" and block.name == self.RESPOND_TOOL:
+                    return json.dumps(block.input)
+            # Forced tool use should make this unreachable; treat it as a failed
+            # call so the chain tries the next model rather than returning prose
+            # the caller would fail to parse.
+            raise ModelError(f"generate:{model} returned no structured output")
+        return "".join(b.text for b in message.content if getattr(b, "type", None) == "text").strip()
+
+
 class ModelGateway:
-    def __init__(self, provider: Provider, *, clock=time.monotonic, sleep=asyncio.sleep):
+    def __init__(
+        self,
+        generation: GenerationProvider,
+        embedding: EmbeddingProvider | None = None,
+        *,
+        clock=time.monotonic,
+        sleep=asyncio.sleep,
+    ):
         settings = get_settings()
         self._sleep = sleep
-        self._provider = provider
+        self._generation = generation
+        # One provider may do both jobs (Gemini does); Bedrock generation pairs
+        # with Gemini embedding.
+        self._embedding = embedding if embedding is not None else generation
         self._settings = settings
         self._responses = _LRU(settings.response_cache_entries)
         self._embeddings = _LRU(settings.response_cache_entries * 4)
@@ -230,8 +330,8 @@ class ModelGateway:
         the answer model's quota, and answers prefer a full model to the lite one.
         """
         s = self._settings
-        fallbacks = [m.strip() for m in s.gemini_fallback_models.split(",")]
-        other = s.gemini_answer_model if primary == s.gemini_fast_model else s.gemini_fast_model
+        fallbacks = [m.strip() for m in s.fallback_models.split(",")]
+        other = s.answer_model if primary == s.fast_model else s.fast_model
         return list(dict.fromkeys(m for m in [primary, *fallbacks, other] if m))
 
     def _cool_down(self, model: str, exc: BaseException) -> None:
@@ -249,11 +349,11 @@ class ModelGateway:
         temperature: float = 0.2,
         json_schema: dict | None = None,
     ) -> Generation:
-        primary = self._settings.gemini_fast_model if fast else self._settings.gemini_answer_model
+        primary = self._settings.fast_model if fast else self._settings.answer_model
         key = _key("generate", primary, system, parts, max_tokens, temperature, json_schema)
         cached = self._responses.get(key)
         if cached is not None:
-            return Generation(text=cached, model=primary, cached=True)
+            return Generation(text=cached, model=model_label(primary), cached=True)
 
         now = time.monotonic()
         chain = self._chain(primary)
@@ -265,7 +365,7 @@ class ModelGateway:
             try:
                 text = await self._with_retry(
                     f"generate:{model}",
-                    lambda model=model: self._provider.generate(
+                    lambda model=model: self._generation.generate(
                         model=model, system=system, parts=parts, max_tokens=max_tokens, temperature=temperature, json_schema=json_schema
                     ),
                     attempts=1,
@@ -278,8 +378,8 @@ class ModelGateway:
             if model == primary:
                 self._responses.put(key, text)
             else:
-                log.warning("generate:%s unavailable, answered by %s", primary, model)
-            return Generation(text=text, model=model)
+                log.warning("generate:%s unavailable, answered by %s", model_label(primary), model_label(model))
+            return Generation(text=text, model=model_label(model))
         raise error or ModelError(f"generate:{primary} failed")
 
     async def embed(self, texts: list[str], task: EmbedTask) -> list[list[float]]:
@@ -320,7 +420,7 @@ class ModelGateway:
         for attempt in range(attempts):
             try:
                 return await asyncio.wait_for(
-                    self._provider.embed(model=model, texts=texts, task=task, dimensions=dims),
+                    self._embedding.embed(model=model, texts=texts, task=task, dimensions=dims),
                     self._settings.llm_timeout_seconds * 4,
                 )
             except Exception as exc:  # noqa: BLE001 - provider errors vary by SDK version
@@ -344,8 +444,24 @@ class ModelGateway:
 @lru_cache
 def get_gateway() -> ModelGateway:
     settings = get_settings()
+    # Embeddings are always Gemini: Claude has no embedding model, and vectors
+    # from another model would not match the ones already stored (D-046).
     if settings.gemini_api_key is None or not settings.gemini_api_key.get_secret_value():
-        raise ModelError("GEMINI_API_KEY is not set. Add it to backend/.env.")
-    return ModelGateway(
-        GeminiProvider(settings.gemini_api_key.get_secret_value(), settings.llm_timeout_seconds, settings.gemini_thinking_level)
+        raise ModelError("GEMINI_API_KEY is not set (embeddings need it). Add it to backend/.env.")
+    gemini = GeminiProvider(
+        settings.gemini_api_key.get_secret_value(), settings.llm_timeout_seconds, settings.gemini_thinking_level
     )
+    if settings.generation_provider == "gemini":
+        return ModelGateway(gemini)
+
+    if not settings.bedrock_answer_model or not settings.bedrock_fast_model:
+        raise ModelError(
+            "BEDROCK_ANSWER_MODEL and BEDROCK_FAST_MODEL are not set. Add the inference-profile ARNs to backend/.env."
+        )
+    claude = ClaudeBedrockProvider(
+        region=settings.aws_region,
+        access_key_id=settings.aws_access_key_id.get_secret_value() if settings.aws_access_key_id else None,
+        secret_access_key=settings.aws_secret_access_key.get_secret_value() if settings.aws_secret_access_key else None,
+        timeout_seconds=settings.llm_timeout_seconds,
+    )
+    return ModelGateway(claude, gemini)

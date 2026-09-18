@@ -58,7 +58,7 @@ LangChain supplies only the **tool definitions** (`StructuredTool` with pydantic
 
 ## 2. The loop (`run_agent`)
 
-Each step makes one call to the **fast model** (`gemini-3.5-flash-lite`, temperature 0.1, 1,500 output tokens) with JSON output constrained by a schema:
+Each step makes one call to the **fast model** (Claude Haiku 4.5, temperature 0.1, 1,500 output tokens) with JSON output constrained by a schema. On Claude the schema is enforced by forced tool use ([D-046](../decisions.md#d-046)); the loop sees the same JSON either way:
 
 ```json
 {"action": "call_tool", "tool": "<one of the tool names>", "arguments_json": "<JSON object as a string>"}

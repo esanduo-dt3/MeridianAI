@@ -2,6 +2,7 @@
 the structural isolation of document content from model instructions."""
 
 import asyncio
+import json
 
 import pytest
 
@@ -136,7 +137,7 @@ def test_compose_answer_places_markers_from_sources_before_final_punctuation():
 
 def test_gateway_falls_back_along_the_chain_and_skips_a_cooling_model():
     from app.core.config import get_settings
-    from app.llm.gateway import ModelGateway
+    from app.llm.gateway import ModelGateway, model_label
 
     settings = get_settings()
     calls: list[str] = []
@@ -144,20 +145,21 @@ def test_gateway_falls_back_along_the_chain_and_skips_a_cooling_model():
     class QuotaProvider:
         async def generate(self, *, model, **_):
             calls.append(model)
-            if model == settings.gemini_answer_model:
+            if model == settings.answer_model:
                 raise RuntimeError("429 RESOURCE_EXHAUSTED. Please retry in 46.08s.")
             return f"from {model}"
 
         async def embed(self, **_):
             return []
 
-    fallback = settings.gemini_fallback_models.split(",")[0].strip()
+    fallback = settings.fallback_models.split(",")[0].strip()
     gateway = ModelGateway(QuotaProvider())
     first = asyncio.run(gateway.generate(system="s", parts=["one"]))
     second = asyncio.run(gateway.generate(system="s", parts=["two"]))
-    assert first.model == second.model == fallback
+    # Answers record the readable label, not the inference-profile ARN (D-046).
+    assert first.model == second.model == model_label(fallback)
     # The quota error puts the answer model on a cooldown, so the second call skips it.
-    assert calls == [settings.gemini_answer_model, fallback, fallback]
+    assert calls == [settings.answer_model, fallback, fallback]
 
 
 class _FakeClock:
@@ -267,3 +269,103 @@ async def test_rate_window_still_waits_when_the_minute_is_genuinely_full():
     now[0] += 10
     await window.acquire(50, reserve=10)
     assert slept and slept[0] == pytest.approx(50.5)
+
+
+# --- Claude on Bedrock (D-046) ------------------------------------------------
+
+
+def _claude_provider(monkeypatch, message):
+    """A ClaudeBedrockProvider whose Bedrock client is a fake. Records the request."""
+    import anthropic
+
+    from app.llm.gateway import ClaudeBedrockProvider
+
+    sent: dict = {}
+
+    class FakeMessages:
+        async def create(self, **request):
+            sent.update(request)
+            return message
+
+    class FakeClient:
+        def __init__(self, **options):
+            sent["_options"] = options
+            self.messages = FakeMessages()
+
+    monkeypatch.setattr(anthropic, "AsyncAnthropicBedrock", FakeClient)
+    provider = ClaudeBedrockProvider(
+        region="us-east-2", access_key_id="AKIAEXAMPLE", secret_access_key="secret", timeout_seconds=15.0
+    )
+    return provider, sent
+
+
+class _Block:
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+
+
+def test_model_label_shortens_an_inference_profile_arn():
+    from app.llm.gateway import model_label
+
+    arn = "arn:aws:bedrock:us-east-2:000000000000:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0"
+    assert model_label(arn) == "claude-sonnet-4"
+    assert model_label("us.anthropic.claude-haiku-4-5-20251001-v1:0") == "claude-haiku-4-5"
+    # A model id that is not Claude is left alone, so the Gemini path still reads well.
+    assert model_label("gemini-3.5-flash") == "gemini-3.5-flash"
+
+
+def test_claude_structured_output_uses_forced_tool_use(monkeypatch):
+    """Claude has no JSON-schema response mode, so a schema becomes a required tool call."""
+    from app.llm.gateway import ClaudeBedrockProvider
+
+    message = _Block(content=[_Block(type="tool_use", name=ClaudeBedrockProvider.RESPOND_TOOL, input={"verdict": "good"})])
+    provider, sent = _claude_provider(monkeypatch, message)
+    schema = {"type": "object", "properties": {"verdict": {"type": "string"}}, "required": ["verdict"]}
+
+    text = asyncio.run(
+        provider.generate(
+            model="arn:example", system="judge passages", parts=["<question>q</question>", "<workspace_documents>d</workspace_documents>"],
+            max_tokens=40, temperature=0.0, json_schema=schema,
+        )
+    )
+
+    assert json.loads(text) == {"verdict": "good"}
+    assert sent["tool_choice"] == {"type": "tool", "name": "respond"}
+    assert sent["tools"][0]["input_schema"] == schema
+    # Non-negotiable 2: the system instruction stays its own argument, and the
+    # passages arrive as separate text blocks of one user turn.
+    assert sent["system"] == "judge passages"
+    assert [b["text"] for b in sent["messages"][0]["content"]] == [
+        "<question>q</question>",
+        "<workspace_documents>d</workspace_documents>",
+    ]
+    assert "d</workspace_documents>" not in sent["system"]
+
+
+def test_claude_returns_text_when_no_schema_is_asked_for(monkeypatch):
+    message = _Block(content=[_Block(type="text", text="  rewritten query  ")])
+    provider, sent = _claude_provider(monkeypatch, message)
+
+    text = asyncio.run(
+        provider.generate(model="arn:example", system="s", parts=["p"], max_tokens=60, temperature=0.3, json_schema=None)
+    )
+
+    assert text == "rewritten query"
+    assert "tools" not in sent and "tool_choice" not in sent
+    # The gateway owns retries and deadlines, so the SDK must not retry as well.
+    assert sent["_options"]["max_retries"] == 0
+
+
+def test_claude_missing_structured_output_fails_so_the_chain_moves_on(monkeypatch):
+    from app.llm.gateway import ModelError
+
+    message = _Block(content=[_Block(type="text", text="I cannot do that")])
+    provider, _ = _claude_provider(monkeypatch, message)
+
+    with pytest.raises(ModelError):
+        asyncio.run(
+            provider.generate(
+                model="arn:example", system="s", parts=["p"], max_tokens=40, temperature=0.0,
+                json_schema={"type": "object", "properties": {}},
+            )
+        )

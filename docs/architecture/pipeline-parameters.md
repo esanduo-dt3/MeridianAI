@@ -160,9 +160,9 @@ PyMuPDF was chosen for the best table and layout detection available, with its A
 
 | Parameter | Value | Source | Why |
 | --- | --- | --- | --- |
-| Answer model | `gemini-3.5-flash`, thinking minimal | [D-026](../decisions.md#d-026) | Measured latency on a JSON answer: flash ~1.2 s, flash-lite ~1.0 s, 3.6-flash 2.8–11.6 s; 2.5 models unavailable to new keys |
-| Fast model | `gemini-3.5-flash-lite` | [D-026](../decisions.md#d-026) | Grading, rewriting, groundedness and agent routing are simpler jobs, and it saves the answer model's scarcer free quota |
-| Thinking level | minimal | [D-026](../decisions.md#d-026) | Hidden reasoning adds latency and counts against output tokens for short structured calls |
+| Answer model | Claude Sonnet 4 on Bedrock | [D-046](../decisions.md#d-046) | Bedrock access removed the free-tier daily caps that had shaped the chain; Sonnet keeps the strong/fast split |
+| Fast model | Claude Haiku 4.5 on Bedrock | [D-046](../decisions.md#d-046) | Grading, rewriting, groundedness and agent routing are simpler and cheaper jobs |
+| Thinking | off | [D-046](../decisions.md#d-046) | Omitted on Sonnet 4 / Haiku 4.5: hidden reasoning adds latency and output tokens on short structured calls |
 | Answer tokens / temperature | 1,500 / 0.2 | Inferred | Room for a multi-sentence cited answer in JSON; low temperature for faithful wording |
 | Output shape | JSON sentences with source ids | Code | Code writes the `[n]` markers, so "a cited sentence cannot lose its citation to a formatting slip" |
 | System prompt is a constant | No document or user text in it | Code, non-negotiable 2 | Structural isolation from prompt injection |
