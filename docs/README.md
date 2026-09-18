@@ -10,6 +10,11 @@ Meridian is an AI-native workspace where every AI answer cites the exact passage
 | Understand what is being built and why | [product/overview.md](product/overview.md) |
 | Know who can do what | [product/roles-and-permissions.md](product/roles-and-permissions.md) |
 | See how the pieces fit together | [architecture/overview.md](architecture/overview.md) |
+| Learn how documents are ingested | [architecture/ingestion.md](architecture/ingestion.md) |
+| Learn how questions are answered | [architecture/retrieval.md](architecture/retrieval.md) |
+| Learn how the Assistant agent works | [architecture/agent.md](architecture/agent.md) |
+| See every pipeline number and why | [architecture/pipeline-parameters.md](architecture/pipeline-parameters.md) |
+| See what to improve in the pipeline | [architecture/pipeline-review.md](architecture/pipeline-review.md) |
 | Look up a table or column | [architecture/data-model.md](architecture/data-model.md) |
 | Look up an endpoint | [architecture/api.md](architecture/api.md) |
 | Change the database | [guides/database.md](guides/database.md) |

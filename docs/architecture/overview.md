@@ -9,8 +9,8 @@
 | Auth | Supabase Auth with Google OAuth | Supabase project `igzjmigtofnpnsaaxmul` | Supabase |
 | Database | Postgres with row-level security, pgvector | `supabase/migrations/` | Supabase |
 | File storage | Supabase Storage, private `documents` bucket | `supabase/migrations/` | Supabase |
-| Model provider | Gemini, behind a swappable provider gateway | `backend/` (planned) | Google |
-| Agent orchestration | LangGraph | `backend/` (planned) | Railway |
+| Model provider | Gemini (generation, embeddings) behind a provider gateway; Voyage reranking | `backend/app/llm/`, `backend/app/rag/rerank.py` | Google, Voyage |
+| Agent orchestration | LangChain tools in a plain tool-calling loop ([D-028](../decisions.md#d-028)) | `backend/app/agent/` | Railway |
 
 ```mermaid
 flowchart LR
@@ -21,7 +21,8 @@ flowchart LR
     API -->|"verify signature via JWKS"| AUTH
     API -->|"service role, after role check"| DB[("Postgres with RLS and pgvector")]
     API --> ST["Storage: documents bucket"]
-    API -.->|"planned"| LLM["Gemini via provider gateway"]
+    API --> LLM["Gemini via provider gateway"]
+    API --> RR["Voyage reranker"]
     FE -->|"publishable key, RLS-limited reads"| DB
 ```
 
@@ -48,4 +49,14 @@ flowchart LR
 | Service-role key | `backend/.env` and deployment secrets only | Bypasses RLS; used only after the API's own role check |
 | Gemini API key | `backend/.env` and deployment secrets only | Model calls |
 
-The rules for keeping document content out of model instructions (non-negotiable 2) are documented in the retrieval and agent pages when those components land.
+## AI pipeline
+
+| Page | Covers |
+| --- | --- |
+| [ingestion.md](ingestion.md) | Upload checks, parsing, canonical text, chunking, embedding |
+| [retrieval.md](retrieval.md) | Hybrid search, reranking, the confidence gate, answers, citations, guardrails, the model gateway |
+| [agent.md](agent.md) | The Assistant's tool loop, document tools, proposals and approval |
+| [pipeline-parameters.md](pipeline-parameters.md) | Every number (top-k, chunk sizes, thresholds, limits) and why it was chosen |
+| [pipeline-review.md](pipeline-review.md) | Weaknesses found on 2026-09-17 and proposed fixes |
+
+Keeping document content out of model instructions (non-negotiable 2) is described in [retrieval.md §7](retrieval.md#7-guardrails) and [agent.md §3](agent.md#3-the-system-prompt).
