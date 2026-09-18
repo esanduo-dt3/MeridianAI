@@ -107,7 +107,7 @@ Model calls before the answer: **0** on a confident or clearly weak-then-good pa
 
 No chunks means an immediate "The workspace documents don't cover this" with confidence 0 and the flag `no_supporting_passages`, with no model call.
 
-Otherwise, one call to the **answer model** (`gemini-3.5-flash`, 1,500 output tokens, temperature 0.2), shaped for isolation (non-negotiable 2):
+Otherwise, one call to the **answer model** (Claude Sonnet 4, 1,500 output tokens, temperature 0.2), shaped for isolation (non-negotiable 2):
 
 - `system` is the constant `ANSWER_SYSTEM`. No document, tool or user text is ever formatted into it.
 - The user turn has two separate parts: `<question>` (angle brackets escaped) and `<workspace_documents>`, where each passage is `<untrusted_document id="n" source="file">` holding a header (file | section | page), the table header for a table continuation, and the content. Passage text is HTML-escaped, so it cannot close its own wrapper, and invisible characters are removed. A passage that matched the scanner carries a visible warning inside its wrapper.
@@ -162,8 +162,10 @@ Red-team result ([D-044](../decisions.md#d-044)): 7 of 8 attacks caught end to e
 
 Every model call goes through `ModelGateway` ([`llm/gateway.py`](../../backend/app/llm/gateway.py), [D-026](../decisions.md#d-026), [D-032](../decisions.md#d-032)).
 
-- **Two roles.** `fast=True` uses `GEMINI_FAST_MODEL` (`gemini-3.5-flash-lite`) for grading, rewrite, groundedness and the agent loop; otherwise `GEMINI_ANSWER_MODEL` (`gemini-3.5-flash`) for answers. Gemini 3 models use `thinking_level = minimal`; older models get a thinking budget of 0.
-- **Model chain.** Requested model, then `GEMINI_FALLBACK_MODELS` (default `gemini-3-flash-preview`), then the other role's model. Each model gets **one** try with a 15-second deadline.
+- **Two providers** ([D-046](../decisions.md#d-046)). Generation runs on **Claude on Amazon Bedrock**; embedding stays on **Gemini**, because Claude has no embedding model and other vectors would not match the stored ones.
+- **Two roles.** `fast=True` uses `BEDROCK_FAST_MODEL` (Claude Haiku 4.5) for grading, rewrite, groundedness and the agent loop; otherwise `BEDROCK_ANSWER_MODEL` (Claude Sonnet 4) for answers.
+- **Structured output.** Claude has no JSON-schema response mode, so a caller's `json_schema` becomes a single tool the model is **required** to call, and the tool's validated input is returned as JSON text. The gateway contract is identical either way, so no caller changed.
+- **Model chain.** Requested model, then `BEDROCK_FALLBACK_MODELS`, then the other role's model. Each model gets **one** try with a 15-second deadline.
 - **Cooldowns.** A failing model is skipped for the wait its quota error names, or 120 seconds, capped at an hour. If every model is cooling, the one recovering first is tried.
 - **Response cache.** An in-process LRU of 512 entries keyed on the exact request. Only responses from the requested model are cached, so a fallback answer is not served again later as if the primary wrote it. A cached response reports the primary model.
 - **Structured output.** A `json_schema` sets `response_mime_type: application/json` and `response_json_schema`.
@@ -171,7 +173,7 @@ Every model call goes through `ModelGateway` ([`llm/gateway.py`](../../backend/a
 
 ## 9. Latency and cost of one question
 
-Measured p50 end to end through the agent on the real-document set: **20.2 s** against the PRD's 8 s target, without reranking ([D-043](../decisions.md#d-043)). On the direct `/agent/ask` path with reranking, p50 was 10.1 s ([D-038](../decisions.md#d-038)).
+Measured p50 end to end through the agent on the real-document set, **on the previous Gemini provider**: **20.2 s** against the PRD's 8 s target, without reranking ([D-043](../decisions.md#d-043)). On the direct `/agent/ask` path with reranking, p50 was 10.1 s ([D-038](../decisions.md#d-038)).
 
 | Step | Calls on the common path | Calls worst case |
 | --- | --- | --- |
@@ -191,9 +193,11 @@ Through the agent, add at least 2 fast-model loop steps (choose the tool, then w
 
 | Variable | Default |
 | --- | --- |
-| `GEMINI_ANSWER_MODEL` / `GEMINI_FAST_MODEL` | `gemini-3.5-flash` / `gemini-3.5-flash-lite` |
-| `GEMINI_FALLBACK_MODELS` | `gemini-3-flash-preview` |
-| `GEMINI_THINKING_LEVEL` | `minimal` |
+| `GENERATION_PROVIDER` | `bedrock` (`gemini` switches generation back) |
+| `BEDROCK_ANSWER_MODEL` / `BEDROCK_FAST_MODEL` | Claude Sonnet 4 / Claude Haiku 4.5 inference-profile ARNs |
+| `BEDROCK_FALLBACK_MODELS` | none |
+| `AWS_REGION` | `us-east-2` |
+| `GEMINI_EMBED_MODEL` | `gemini-embedding-001` (embeddings only) |
 | `LLM_TIMEOUT_SECONDS` / `MODEL_COOLDOWN_SECONDS` | 15 / 120 |
 | `RESPONSE_CACHE_ENTRIES` | 512 |
 | `VOYAGE_API_KEY` / `VOYAGE_RERANK_MODEL` | none / `rerank-2.5` |

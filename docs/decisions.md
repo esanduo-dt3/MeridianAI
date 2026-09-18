@@ -51,6 +51,8 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-042](#d-042) | One Assistant: the agent chooses when to consult documents and which document tool to use | Accepted | Owner | 2026-09-17 |
 | [D-043](#d-043) | Real-document evaluation end to end through the agent, and the ingestion defects it exposed | Accepted | Owner | 2026-09-17 |
 | [D-044](#d-044) | Injection red-team suite: 7 of 8 caught; subtle factual poisoning was obeyed | Accepted | Owner | 2026-09-17 |
+| [D-045](#d-045) | Deploy both services on Railway, not Vercel | Accepted | Owner | 2026-09-17 |
+| [D-046](#d-046) | Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini | Accepted | Owner | 2026-09-18 |
 
 ---
 
@@ -690,3 +692,24 @@ Each of these closes a gap the UI or the guardrails need.
   - Sign-in redirects to the frontend's origin, so its Railway URL must be in Supabase Auth's allowed redirect URLs.
   - Deploys are from the CLI for now; Railway can be connected to the GitHub repository later for deploys on push.
   - The PyMuPDF licence (D-024) applies once the service is public.
+
+## D-046
+
+**Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini**
+
+- **Context.** The owner was given AWS Bedrock access to Claude for the Meridian demo, with inference-profile ARNs for Claude Sonnet 4 and Claude Haiku 4.5 in `us-east-2`. Gemini's free tier had been the binding constraint on the build: a per-model daily request cap that forced a model chain and cooldowns ([D-032](#d-032)), latency that missed the PRD's p50 target at busy times, and fallback answers that made golden-set runs unfair to measure ([D-031](#d-031), [D-037](#d-037)).
+- **Decision.**
+  - **Generation runs on Claude on Bedrock.** `gemini-3.5-flash` is replaced by Claude Sonnet 4 for answers, and `gemini-3.5-flash-lite` by Claude Haiku 4.5 for grading, query rewriting, groundedness checks and the agent loop. The split of work between a strong and a fast model is unchanged.
+  - **Embeddings stay on Gemini** (`gemini-embedding-001`, 1536 dimensions). Claude has no embedding model, and vectors from any other model would not be comparable with the ones already stored, so moving them would mean a schema change and re-ingesting every document. The owner chose to keep them. `GEMINI_API_KEY` is therefore still required, for embeddings only.
+  - **Reranking stays on Voyage** `rerank-2.5`. The free-tier token cap recorded in [D-037](#d-037) still applies and is unchanged by this decision.
+  - **The Bedrock InvokeModel client** (`AsyncAnthropicBedrock` from the `anthropic` SDK) is used, not the Mantle client, because the account was given inference-profile ARNs and that client addresses models by ARN. The Mantle client names models by short id instead.
+  - **Structured output uses forced tool use.** Claude has no JSON-schema response mode as Gemini does. A caller's `json_schema` becomes a single tool the model is required to call, and the tool's validated input is returned as JSON text. Every caller keeps the same gateway contract, so nothing above `app/llm/gateway.py` changed.
+  - **The gateway now holds two providers**, one for generation and one for embedding, behind the same cache, model chain, cooldowns and 15-second deadline. `GENERATION_PROVIDER=gemini` switches generation back without touching code.
+  - **Answers record a readable model label**, `claude-sonnet-4` rather than the full ARN, so the review queue and pipeline health stay legible. The chain and cooldowns still key on the full ARN.
+- **Why.** Paid Bedrock capacity removes the free-tier daily caps that shaped [D-031](#d-031), [D-032](#d-032) and [D-037](#d-037), which is the largest single lever on both answer quality and the p50 latency target. Keeping embeddings on Gemini avoids re-embedding every document for no retrieval benefit.
+- **Consequences.**
+  - Two credentials are needed: AWS for generation, Gemini for embeddings.
+  - The model chain still exists, but it now protects against transient Bedrock errors rather than daily quota exhaustion. Cooldowns and the response cache are unchanged.
+  - `agent_answers.model` holds Claude labels from now on; rows written before this change keep their Gemini model names, and the pipeline health view groups by whatever was recorded.
+  - The latency and quality figures in [D-038](#d-038) and [D-043](#d-043) were measured on Gemini and are **not** comparable with runs after this change. The golden set should be re-run on Claude before any latency or quality claim is repeated.
+  - Verified: `pytest` 157 passed, including new tests that a schema becomes a forced tool call, that document text never enters the system instruction on this provider, that a missing structured result fails so the chain moves on, and that ARNs shorten to readable labels. **Not yet verified live against Bedrock.**

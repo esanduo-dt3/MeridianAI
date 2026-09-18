@@ -5,6 +5,17 @@ os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_PUBLISHABLE_KEY", "test-publishable")
 os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role")
 os.environ["ENVIRONMENT"] = "test"
+# Generation runs on Claude on Bedrock (D-046). Tests never reach AWS: the
+# provider is always faked. These only have to be shaped like real ids.
+os.environ.setdefault(
+    "BEDROCK_ANSWER_MODEL",
+    "arn:aws:bedrock:us-east-2:000000000000:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0",
+)
+os.environ.setdefault(
+    "BEDROCK_FAST_MODEL",
+    "arn:aws:bedrock:us-east-2:000000000000:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+)
+os.environ.setdefault("BEDROCK_FALLBACK_MODELS", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

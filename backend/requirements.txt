@@ -8,7 +8,9 @@ pytest==9.1.1
 # Document parsing (PDF: AGPL, see docs/decisions.md D-024)
 pymupdf==1.28.2
 python-docx==1.2.0
-# Models: Gemini for embeddings and generation, Voyage for reranking
+# Models: Claude on Amazon Bedrock for generation (D-046), Gemini for embeddings,
+# Voyage for reranking. The bedrock extra pulls in boto3 for SigV4 signing.
+anthropic[bedrock]==1.6.0
 google-genai==2.23.0
 voyageai==0.5.0
 numpy==2.5.3
