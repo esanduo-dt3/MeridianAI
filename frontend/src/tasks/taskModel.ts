@@ -88,3 +88,13 @@ export function isOverdue(task: Task): boolean {
 
 const dueFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
 export const formatDue = (date: string) => dueFormat.format(new Date(`${date}T00:00:00`))
+
+/** Which slice of the work is on screen: all of it, the backlog, or one sprint (D-048). */
+export type Scope = 'all' | 'backlog' | string
+
+/** A task with no sprint is in the backlog, so it is never in two places at once. */
+export function scopeTasks(tasks: Task[], scope: Scope): Task[] {
+  if (scope === 'all') return tasks
+  if (scope === 'backlog') return tasks.filter((task) => task.sprint_id === null)
+  return tasks.filter((task) => task.sprint_id === scope)
+}

@@ -1,7 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, agent_actions, agent_chat, ask, documents, health, me, members, notes, tasks, workspaces
+from app.api import (
+    admin,
+    agent_actions,
+    agent_chat,
+    ask,
+    documents,
+    health,
+    me,
+    members,
+    notes,
+    sprints,
+    tasks,
+    workspaces,
+)
 from app.core.config import get_settings
 from app.core.security_headers import SecurityHeadersMiddleware
 
@@ -29,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(members.router)
     app.include_router(tasks.router)
+    app.include_router(sprints.router)
     app.include_router(agent_actions.router)
     app.include_router(documents.router)
     app.include_router(notes.router)

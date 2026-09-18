@@ -26,6 +26,10 @@ ADMIN_ONLY = [
     ("delete", "/tasks/00000000-0000-0000-0000-000000000009", None),
     ("post", "/agent/actions/00000000-0000-0000-0000-000000000009/approve", None),
     ("post", "/agent/actions/00000000-0000-0000-0000-000000000009/reject", None),
+    # Planning the work is an Admin job; Members still change status and order (D-048).
+    ("post", "/admin/sprints", {"name": "Sprint 1"}),
+    ("patch", "/admin/sprints/00000000-0000-0000-0000-000000000009", {"status": "active"}),
+    ("delete", "/admin/sprints/00000000-0000-0000-0000-000000000009", None),
 ]
 
 
@@ -71,3 +75,59 @@ def test_invalid_task_updates_are_rejected(client, as_admin, body):
 def test_blank_task_title_is_rejected(client, as_admin):
     response = client.post("/tasks", json={"title": "   "}, headers=WORKSPACE)
     assert response.status_code == 422
+
+
+# --- Sprints and the backlog (D-048) -----------------------------------------
+
+
+def test_a_member_cannot_move_a_task_between_backlog_and_sprint(client, as_member):
+    """Members change status and order only; the sprint a task sits in is content."""
+    response = client.patch(
+        "/tasks/00000000-0000-0000-0000-000000000009",
+        json={"sprint_id": "00000000-0000-0000-0000-00000000000b"},
+        headers=WORKSPACE,
+    )
+    assert response.status_code == 403
+    assert "status and order" in response.json()["detail"]
+
+
+def test_the_sprint_column_did_not_narrow_what_a_member_may_edit():
+    """Members keep status and order, and gain nothing; sprint_id is content."""
+    from app.api.tasks import MEMBER_EDITABLE
+
+    assert MEMBER_EDITABLE == {"status", "position"}
+
+
+def test_reading_the_sprint_plan_needs_membership_not_an_admin():
+    """Members see the plan they are working to; only Admins change it."""
+    import inspect
+
+    from fastapi.params import Depends as DependsParam
+
+    from app.api import sprints
+    from app.core.workspace import get_workspace_context, require_admin
+
+    def dependencies(endpoint):
+        return [
+            p.default.dependency
+            for p in inspect.signature(endpoint).parameters.values()
+            if isinstance(p.default, DependsParam)
+        ]
+
+    assert get_workspace_context in dependencies(sprints.list_sprints)
+    assert require_admin not in dependencies(sprints.list_sprints)
+    for write in (sprints.create_sprint, sprints.update_sprint, sprints.delete_sprint):
+        assert require_admin in dependencies(write)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"name": "   "},                                            # a sprint needs a name
+        {"name": "x" * 81},                                         # 80 characters is the limit
+        {"name": "Sprint 1", "status": "archived"},                 # not a sprint state
+        {"name": "Sprint 1", "start_date": "2026-10-10", "end_date": "2026-10-01"},  # ends before it starts
+    ],
+)
+def test_invalid_sprints_are_rejected(client, as_admin, body):
+    assert client.post("/admin/sprints", json=body, headers=WORKSPACE).status_code == 422

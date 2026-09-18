@@ -67,6 +67,8 @@ export interface Task {
   priority: Priority
   position: number
   parent_task_id: string | null
+  /** The sprint this task is in. Null means the backlog (D-048). */
+  sprint_id: string | null
   due_date: string | null
   source: 'manual' | 'agent'
   created_at: string
@@ -104,6 +106,32 @@ export interface TaskInput {
   due_date?: string | null
   assignee_id?: string | null
   parent_task_id?: string | null
+  /** Null moves the task to the backlog. Admin-only (D-048). */
+  sprint_id?: string | null
+}
+
+export type SprintStatus = 'planned' | 'active' | 'completed'
+
+export interface Sprint {
+  id: string
+  name: string
+  start_date: string | null
+  end_date: string | null
+  status: SprintStatus
+  created_at: string
+}
+
+export interface SprintBoard {
+  sprints: Sprint[]
+  /** The one sprint in progress, if any. The board opens on it. */
+  active_sprint_id: string | null
+}
+
+export interface SprintInput {
+  name?: string
+  start_date?: string | null
+  end_date?: string | null
+  status?: SprintStatus
 }
 
 export type ParsedStatus = 'pending' | 'processing' | 'ready' | 'failed'

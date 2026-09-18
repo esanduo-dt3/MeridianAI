@@ -10,6 +10,7 @@ import type { Priority, Task, TaskStatus } from '../lib/types'
 import { useWorkspace } from '../workspace/WorkspaceProvider'
 import { QuickAdd } from './QuickAdd'
 import { Assignee, DueDate, PriorityIcon, StatusCircle } from './TaskBits'
+import { useSprints } from './useSprints'
 import { PRIORITIES, priorityLabel, STATUSES, statusLabel } from './taskModel'
 import { useRoster, useTaskMutations } from './useTasks'
 
@@ -42,6 +43,8 @@ function DrawerBody({ task, allTasks, onClose, onOpen }: { task: Task; allTasks:
   const { isAdmin } = useWorkspace()
   const { update, remove } = useTaskMutations()
   const roster = useRoster()
+  const sprints = useSprints()
+  const sprintName = sprints.data?.sprints.find((sprint) => sprint.id === task?.sprint_id)?.name ?? null
   const [title, setTitle] = useState(task.title)
   const [description, setDescription] = useState(task.description)
   const [titleError, setTitleError] = useState<string | null>(null)
@@ -180,6 +183,31 @@ function DrawerBody({ task, allTasks, onClose, onOpen }: { task: Task; allTasks:
                 <PriorityIcon priority={task.priority} />
                 {priorityLabel(task.priority)}
               </span>
+            )}
+          </dd>
+
+          <dt className="text-ink-3">Sprint</dt>
+          <dd>
+            {isAdmin ? (
+              <SelectField
+                label="Sprint"
+                hideLabel
+                value={task.sprint_id ?? ''}
+                disabled={sprints.isPending}
+                onChange={(e) => save({ sprint_id: e.target.value || null })}
+                className="min-h-9 w-60 text-sm"
+              >
+                {/* No sprint is the backlog: a task is never in two places (D-048). */}
+                <option value="">Backlog</option>
+                {sprints.data?.sprints.map((sprint) => (
+                  <option key={sprint.id} value={sprint.id}>
+                    {sprint.name}
+                    {sprint.id === sprints.data?.active_sprint_id ? ' (in progress)' : ''}
+                  </option>
+                ))}
+              </SelectField>
+            ) : (
+              <span className="text-ink">{sprintName ?? 'Backlog'}</span>
             )}
           </dd>
 
