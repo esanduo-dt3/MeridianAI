@@ -42,7 +42,9 @@ from app.core.supabase import Db
 from app.core.workspace import WorkspaceContext
 
 MAX_PROPOSALS_PER_TURN = 5
-# Each document answer spends an answer-model call and a groundedness check (D-032).
+# The loop ends the turn after a document tool answers (D-049), so one turn
+# normally produces one answer. This still bounds the case where a document tool
+# fails and the model tries another one.
 MAX_DOCUMENT_ANSWERS_PER_TURN = 2
 MIN_QUOTE_WORDS = 3
 PRIORITY_RANK = {"urgent": 0, "high": 1, "medium": 2, "low": 3, "none": 4}

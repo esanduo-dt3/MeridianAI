@@ -160,7 +160,7 @@ PyMuPDF was chosen for the best table and layout detection available, with its A
 
 | Parameter | Value | Source | Why |
 | --- | --- | --- | --- |
-| Answer model | Claude Sonnet 4 on Bedrock | [D-046](../decisions.md#d-046) | Bedrock access removed the free-tier daily caps that had shaped the chain; Sonnet keeps the strong/fast split |
+| Answer model | Claude Haiku 4.5 on Bedrock | [D-049](../decisions.md#d-049) | Sonnet 4 is refused by Bedrock as legacy on this account; the split stays in configuration, so a current Sonnet restores it |
 | Fast model | Claude Haiku 4.5 on Bedrock | [D-046](../decisions.md#d-046) | Grading, rewriting, groundedness and agent routing are simpler and cheaper jobs |
 | Thinking | off | [D-046](../decisions.md#d-046) | Omitted on Sonnet 4 / Haiku 4.5: hidden reasoning adds latency and output tokens on short structured calls |
 | Answer tokens / temperature | 1,500 / 0.2 | Inferred | Room for a multi-sentence cited answer in JSON; low temperature for faithful wording |

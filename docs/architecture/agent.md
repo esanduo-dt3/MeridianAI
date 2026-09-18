@@ -58,7 +58,7 @@ LangChain supplies only the **tool definitions** (`StructuredTool` with pydantic
 
 ## 2. The loop (`run_agent`)
 
-Each step makes one call to the **fast model** (Claude Haiku 4.5, temperature 0.1, 1,500 output tokens) with JSON output constrained by a schema. On Claude the schema is enforced by forced tool use ([D-046](../decisions.md#d-046)); the loop sees the same JSON either way:
+Each step makes one call to **Claude Haiku 4.5** (temperature 0.1, 1,500 output tokens). On Claude the tools are passed to the model directly and it returns a **real tool call** with validated arguments, or plain text when it is replying ([D-049](../decisions.md#d-049)). A provider without native tool calling is asked for the same decision as a JSON object instead:
 
 ```json
 {"action": "call_tool", "tool": "<one of the tool names>", "arguments_json": "<JSON object as a string>"}
@@ -72,7 +72,9 @@ The user turn is rebuilt every step from:
 3. `<work_so_far>`: every earlier tool call and its result this turn, and any error notes;
 4. on the last step only: "You have used every tool step. Respond now with what you have."
 
-**Step budget.** Up to 6 tool calls. Step 7 removes `call_tool` from the schema's enum, so the model can only reply. A reply after the budget sets `stopped_early`.
+**Step budget.** Up to 6 tool calls. On the final step no tools are offered, so the model can only reply. A reply after the budget sets `stopped_early`.
+
+**The turn ends when a document tool answers** ([D-049](../decisions.md#d-049)). The checked answer is rendered in full below the reply, so the one line above it is written in code from the recorded answer rather than by another model call: it says the documents do not cover the question when the answer is unanswerable, and warns when it is ungrounded or flagged. Task or member work must therefore come *before* a document tool in the same turn, which the prompt requires.
 
 **Error handling:** nothing is raised to the person. Each problem becomes a note in `<work_so_far>` and the loop continues:
 
