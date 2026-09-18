@@ -7,10 +7,12 @@ import { errorText } from '../lib/queryClient'
 import type { Task } from '../lib/types'
 import { ProposalsPanel } from '../tasks/ProposalsPanel'
 import { QuickAdd } from '../tasks/QuickAdd'
+import { SprintBar } from '../tasks/SprintBar'
 import { TaskBoardView } from '../tasks/TaskBoardView'
 import { TaskDrawer } from '../tasks/TaskDrawer'
 import { TaskListView } from '../tasks/TaskListView'
-import { buildTree, filterTasks } from '../tasks/taskModel'
+import { useSprints } from '../tasks/useSprints'
+import { buildTree, filterTasks, scopeTasks, type Scope } from '../tasks/taskModel'
 import { useTaskBoard } from '../tasks/useTasks'
 import { useWorkspace } from '../workspace/WorkspaceProvider'
 
@@ -24,8 +26,11 @@ const VIEWS: { value: View; label: string; icon: Icon }[] = [
 export function TasksPage() {
   const { active, isAdmin } = useWorkspace()
   const board = useTaskBoard()
+  const sprints = useSprints()
   const [params, setParams] = useSearchParams()
   const view: View = params.get('view') === 'board' ? 'board' : 'list'
+  // Which slice of the work is on screen: all of it, the backlog, or one sprint (D-048).
+  const scope: Scope = params.get('sprint') ?? 'all'
   const openId = params.get('task')
   const [query, setQuery] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
@@ -54,10 +59,11 @@ export function TasksPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const tasks = useMemo(() => board.data?.tasks ?? [], [board.data])
+  const allTasks = useMemo(() => board.data?.tasks ?? [], [board.data])
+  const tasks = useMemo(() => scopeTasks(allTasks, scope), [allTasks, scope])
   const visible = useMemo(() => filterTasks(tasks, query, showCompleted), [tasks, query, showCompleted])
   const tree = useMemo(() => buildTree(visible), [visible])
-  const openTask = openId ? (tasks.find((t) => t.id === openId) ?? null) : null
+  const openTask = openId ? (allTasks.find((t) => t.id === openId) ?? null) : null
   const openCount = tasks.filter((t) => t.status !== 'done').length
   const doneCount = tasks.length - openCount
   const onOpen = (task: Task) => setParam('task', task.id)
@@ -127,6 +133,14 @@ export function TasksPage() {
           </label>
           {!isAdmin && <p className="text-sm text-ink-3 sm:ml-auto">You can change task status. Admins add and edit tasks.</p>}
         </div>
+
+        <SprintBar
+          board={sprints.data}
+          tasks={allTasks}
+          scope={scope}
+          onScope={(next) => setParam('sprint', next === 'all' ? null : next)}
+          canManage={isAdmin}
+        />
       </header>
 
       {board.isPending ? (
@@ -163,7 +177,7 @@ export function TasksPage() {
         </>
       )}
 
-      <TaskDrawer task={openTask} allTasks={tasks} onClose={() => setParam('task', null)} onOpen={onOpen} />
+      <TaskDrawer task={openTask} allTasks={allTasks} onClose={() => setParam('task', null)} onOpen={onOpen} />
     </div>
   )
 }

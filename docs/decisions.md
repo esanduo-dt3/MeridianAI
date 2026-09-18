@@ -54,6 +54,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-045](#d-045) | Deploy both services on Railway, not Vercel | Accepted | Owner | 2026-09-17 |
 | [D-046](#d-046) | Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini | Accepted | Owner | 2026-09-18 |
 | [D-047](#d-047) | Team roles are free text, set by an Admin, and the agent proposes an assignee from them | Accepted | Owner | 2026-09-18 |
+| [D-048](#d-048) | Backlog and sprints: the backlog is the absence of a sprint, and planning is Admin-only | Accepted | Owner | 2026-09-18 |
 
 ---
 
@@ -733,3 +734,24 @@ Each of these closes a gap the UI or the guardrails need.
   - Members see each other's team roles; only Admins can edit them.
   - Whether the model picks sensible people is not proven by these tests, only that the data reaches it and that a proposal carries the assignee and the reasoning. It needs a live check before the demo.
   - Verified: `pytest` 159 passed, including that `list_members` prints team roles and "not set", and that a proposal carries an assignee plus reasoning and still writes no task. Frontend typecheck, lint and build pass.
+
+## D-048
+
+**Backlog and sprints: the backlog is the absence of a sprint, and planning is Admin-only**
+
+- **Context.** The backlog and sprint board is the PRD's other SHOULD-scope item. `tasks.sprint_id` has existed since the core schema with no table behind it, deliberately ([D-010](#d-010)). Both gates have passed, so the owner picked it up.
+- **Decision.**
+  - **The backlog is not a table.** A task whose `sprint_id` is null is in the backlog. Moving work in or out is one column write, and a task can never be in two places or in none.
+  - **`sprints`** holds `name` (1–80 chars), optional `start_date` and `end_date`, and `status` (`planned`, `active`, `completed`). A check constraint refuses an end date before the start date.
+  - **At most one active sprint per workspace**, enforced by a partial unique index rather than by the API, so "which sprint is active" always has one answer. Trying to start a second returns 409 with a readable message.
+  - **Deleting a sprint returns its tasks to the backlog** (`on delete set null`), because deleting a plan should never delete the work.
+  - **Planning is Admin-only.** `GET /sprints` needs membership; `POST`, `PATCH` and `DELETE /admin/sprints` need an Admin. Moving a task between the backlog and a sprint is an Admin action too: `sprint_id` is content, so the existing `tasks_member_update_guard` already refuses it for a Member, and no trigger change was needed. Members keep exactly what [D-021](#d-021) gave them, status and order.
+  - **The PRD's `POST /admin/sprints` and `GET /sprints` are built as written.** `PATCH /admin/sprints/{id}` and `DELETE /admin/sprints/{id}` are added beyond the PRD, because a sprint that can be created but never started, closed or removed is not usable.
+  - **The Tasks page gains a scope**, held in the URL as `?sprint=`: All work, Backlog, or a named sprint, each with a count of open tasks, and the active sprint marked. List and Board views both work inside the scope. Admins get Start sprint, Complete sprint, delete, and a sprint field on each task.
+  - **Sprint changes are audited** as `sprint.created`, `sprint.status_changed` and `sprint.deleted`.
+- **Why.** Modelling the backlog as a real container would mean two rows to keep in step and a task that could be in both or neither. The absence of a sprint cannot drift out of step with anything.
+- **Consequences.**
+  - Migration `20260918100000_sprints` creates the table, the foreign key from `tasks.sprint_id`, the one-active-sprint index and the row-level security policies. No existing task changes: every task starts in the backlog.
+  - The agent does not put tasks into sprints. It proposes tasks, which land in the backlog for an Admin to plan; nothing in the agent's tools mentions sprints.
+  - Completed sprints stay in the list but drop out of the scope tabs, so the bar does not grow without limit. There is no sprint archive view yet.
+  - Verified: `pytest` 169 passed (10 new: Members cannot move a task between backlog and sprint, `sprint_id` is not member-editable, reading the plan needs membership while every write needs an Admin, and four invalid-sprint shapes are refused). Frontend typecheck, lint and build pass. **The migration has not been applied to the database yet**, so this is not exercised against live data.
