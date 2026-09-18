@@ -30,7 +30,7 @@ Errors return `{"detail": "<message>"}`.
 | `DELETE /members/me` | Workspace | Any | Leaves the workspace. 409 if the caller is its last Admin |
 | `GET /members` | Workspace | Any | `members` with profiles; `invites` (pending) for Admins only |
 | `POST /admin/members` | Workspace | Admin | Body `{email, auth_role}`. Adds an existing account (`outcome: "added"`) or stores a pending invite (`"invited"`). 409 if already a member or already invited |
-| `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`. 409 if it would leave no Admin |
+| `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`, `{team_role}` or both. `team_role` is free text, 1–80 chars; empty clears it ([D-047](../decisions.md#d-047)). 409 if it would leave no Admin |
 | `DELETE /admin/members/{id}` | Workspace | Admin | Removes a member. 409 if it would leave no Admin |
 | `DELETE /admin/invites/{id}` | Workspace | Admin | Revokes a pending invite |
 | `GET /tasks` | Workspace | Any | `tasks` (with assignee and creator profiles) and `proposals` (pending agent actions) |

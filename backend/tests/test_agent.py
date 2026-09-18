@@ -341,3 +341,51 @@ def test_chat_endpoint_records_the_turn_in_the_audit_log(client, monkeypatch):
     audit_rows = [row for table, row in service.inserts if table == "audit_log"]
     assert audit_rows[0]["action"] == "agent.chat"
     assert audit_rows[0]["details"]["tools"][0]["tool"] == "list_tasks"
+
+
+# --- Team roles and assignment (D-047) ---------------------------------------
+
+MEMBERS_WITH_TEAM_ROLES = [
+    {"user_id": USER, "auth_role": "Admin", "team_role": "Product lead",
+     "users": {"email": "me@example.com", "full_name": "Me"}},
+    {"user_id": "u-2", "auth_role": "Member", "team_role": "Backend engineer",
+     "users": {"email": "dev@example.com", "full_name": "Dev"}},
+    {"user_id": "u-3", "auth_role": "Member", "team_role": None,
+     "users": {"email": "new@example.com", "full_name": "New"}},
+]
+
+
+@pytest.mark.anyio
+async def test_list_members_shows_team_roles_so_the_agent_can_match_work(monkeypatch):
+    db = FakeDb({"workspace_members": MEMBERS_WITH_TEAM_ROLES})
+    ctx = make_ctx("who is on the team?", db=db)
+    result, gateway = await run(monkeypatch, ctx, [call("list_members"), respond("Listed the team.")])
+
+    assert result.steps[0].tool == "list_members"
+    listing = [p for p in gateway.calls[1]["parts"] if "list_members" in p][0]
+    assert "team role: Backend engineer" in listing
+    assert "team role: Product lead" in listing
+    # A member with no team role says so, rather than being left ambiguous.
+    assert "team role: not set" in listing
+
+
+@pytest.mark.anyio
+async def test_agent_can_propose_an_assignee_from_a_team_role(monkeypatch):
+    db = FakeDb({"workspace_members": [{"user_id": "u-2", "users": {"email": "dev@example.com"}}]})
+    service = FakeDb()
+    message = "create a task to migrate the database and assign whoever fits"
+    ctx = make_ctx(message, db=db, service=service)
+
+    await run(monkeypatch, ctx, [
+        call("propose_task", title="Migrate the database", reasoning="Matched the Backend engineer team role.",
+             user_request_quote="create a task to migrate the database", assignee_email="dev@example.com"),
+        respond("Proposed it for approval."),
+    ])
+
+    assert len(ctx.state.proposals) == 1
+    proposal = ctx.state.proposals[0]
+    assert proposal["assignee_email"] == "dev@example.com"
+    # The Admin who approves sees why this person was chosen.
+    assert "Backend engineer" in proposal["reasoning"]
+    # It is still only a proposal: the pending row and its audit entry, no task.
+    assert [table for table, _ in service.inserts] == ["agent_actions", "audit_log"]

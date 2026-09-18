@@ -164,6 +164,28 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
     onError: (err) => toast.error(errorText(err, "The role couldn't be changed.")),
   })
 
+  // The team role is what this person does, not what they may do in Meridian.
+  // The agent reads it to suggest an assignee; it never grants permissions.
+  const [teamRole, setTeamRole] = useState(member.team_role ?? '')
+  const saveTeamRole = useMutation({
+    mutationFn: (team_role: string) =>
+      apiFetch<Member>(`/admin/members/${member.id}`, { method: 'PATCH', body: { team_role } }),
+    onSuccess: (updated) => {
+      setTeamRole(updated.team_role ?? '')
+      void invalidate()
+      toast.success(updated.team_role ? `${name} is the ${updated.team_role}` : `Cleared the team role for ${name}`)
+    },
+    onError: (err) => {
+      setTeamRole(member.team_role ?? '')
+      toast.error(errorText(err, "The team role couldn't be saved."))
+    },
+  })
+
+  const commitTeamRole = () => {
+    const next = teamRole.trim()
+    if (next !== (member.team_role ?? '')) saveTeamRole.mutate(next)
+  }
+
   const remove = useMutation({
     mutationFn: () => apiFetch<void>(`/admin/members/${member.id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -183,11 +205,27 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
         </p>
         <p className="truncate text-sm text-ink-3">
           {member.profile.full_name ? `${member.profile.email} · ` : ''}Joined {dateFormat.format(new Date(member.joined_at))}
+          {!canManage && member.team_role ? ` · ${member.team_role}` : ''}
         </p>
       </div>
 
       {canManage ? (
         <div className="flex items-center gap-1">
+          <TextField
+            label={`Team role for ${name}`}
+            hideLabel
+            placeholder="Team role"
+            value={teamRole}
+            maxLength={80}
+            disabled={saveTeamRole.isPending}
+            onChange={(event) => setTeamRole(event.target.value)}
+            onBlur={commitTeamRole}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur()
+              if (event.key === 'Escape') setTeamRole(member.team_role ?? '')
+            }}
+            className="min-h-10 w-40 text-sm"
+          />
           <SelectField
             label={`Role for ${name}`}
             hideLabel

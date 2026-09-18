@@ -25,6 +25,8 @@ export interface Member {
   id: string
   user_id: string
   auth_role: AuthRole
+  /** What this person does on the team, e.g. 'Backend engineer'. Admin-set; read by the agent when it proposes an assignee (D-047). */
+  team_role: string | null
   joined_at: string
   profile: { email: string; full_name: string | null; avatar_url: string | null }
 }
