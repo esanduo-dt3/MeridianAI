@@ -119,7 +119,7 @@ Then, in code:
 1. **`compose_answer`** strips any `[n]` the model wrote itself and appends markers from each sentence's `sources` (before the final punctuation). A cited sentence cannot lose its citation to a formatting slip. If the JSON is unreadable, the raw text is used and treated as answerable.
 2. **`redact_secrets`** on the answer (Google, OpenAI, Anthropic, AWS, GitHub, Slack, Supabase keys, private keys, JWTs).
 3. **`renumber_citations`** keeps markers that point at a real passage, renumbers them 1..k in order of first use, drops invalid ones, and builds the citation list.
-4. **Groundedness** (`check_grounded`): the fast model reads the answer and **only the cited passages** and returns `{"grounded", "unsupported": [...]}`. An unreadable verdict counts as not grounded. No citations skips the check (grounded = true).
+4. **Groundedness** ([D-049](../decisions.md#d-049)): the answer model returns its own `grounded` and `unsupported` verdict **in the same call**, so there is no second model call. Two checks in code can overrule it: a factual sentence citing nothing, and a sentence citing a passage id that was never shown. Unreadable output is flagged, and a missing verdict counts as not grounded. This is a self-check, and weaker than an independent pass.
 5. **Confidence** (`confidence_for`, [D-027](../decisions.md#d-027)): `mean(rerank score of cited passages) × (1.0 if best grade is good else 0.6)`, clamped to [0, 1], 3 decimals. **Null** when cited passages have no rerank score. Always returned with `label: "uncalibrated"` and its formula as `basis`.
 
 ### Flag reasons
@@ -184,10 +184,10 @@ Measured p50 end to end through the agent on the real-document set, **on the pre
 | Grade | 0 | 2 fast |
 | Rewrite | 0 | 1 fast |
 | Answer | 1 answer model | 1 |
-| Groundedness | 1 fast | 1 |
+| Groundedness | 0 (inside the answer call) | 0 |
 | Record (run, answer, citations, audit) | 4 REST, sequential | 4 |
 
-Through the agent, add at least 2 fast-model loop steps (choose the tool, then write the reply).
+Through the agent, add **1** fast-model loop step to choose the tool. The line above the answer is written in code, not by a model ([D-049](../decisions.md#d-049)), so a document question costs 2 model calls in total.
 
 ## Configuration
 

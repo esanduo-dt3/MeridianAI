@@ -55,6 +55,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-046](#d-046) | Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini | Accepted | Owner | 2026-09-18 |
 | [D-047](#d-047) | Team roles are free text, set by an Admin, and the agent proposes an assignee from them | Accepted | Owner | 2026-09-18 |
 | [D-048](#d-048) | Backlog and sprints: the backlog is the absence of a sprint, and planning is Admin-only | Accepted | Owner | 2026-09-18 |
+| [D-049](#d-049) | Fewer model calls per question: Haiku everywhere, native tool calls, and groundedness folded into the answer | Accepted | Owner | 2026-09-18 |
 
 ---
 
@@ -757,3 +758,25 @@ Each of these closes a gap the UI or the guardrails need.
   - The agent does not put tasks into sprints. It proposes tasks, which land in the backlog for an Admin to plan; nothing in the agent's tools mentions sprints.
   - Completed sprints stay in the list but drop out of the scope tabs, so the bar does not grow without limit. There is no sprint archive view yet.
   - Verified: `pytest` 169 passed (10 new: Members cannot move a task between backlog and sprint, `sprint_id` is not member-editable, reading the plan needs membership while every write needs an Admin, and four invalid-sprint shapes are refused). Frontend typecheck, lint and build pass. **The migration has not been applied to the database yet**, so this is not exercised against live data.
+
+## D-049
+
+**Fewer model calls per question: Haiku everywhere, native tool calls, and groundedness folded into the answer**
+
+- **Context.** A document question cost four model calls in series: the agent chose a tool, the answer model wrote the answer, a second call checked groundedness, and a third wrote one introductory sentence above an answer the page already shows in full. The owner asked for fewer calls and lower latency. Running the agent live also exposed two defects introduced by the move to Claude ([D-046](#d-046)).
+- **Decision.**
+  - **Claude Haiku 4.5 answers as well.** Claude Sonnet 4 is refused by Bedrock as a legacy model on this account, so the answer model is Haiku. The strong/fast split stays in the code and in configuration: setting `BEDROCK_ANSWER_MODEL` to a current Sonnet restores it without a code change.
+  - **The groundedness check moves into the answer call.** The answer model returns `answerable`, `sentences` with their `sources`, and its own `grounded` and `unsupported` verdict, in one structured response. The separate call is removed.
+  - **The schema is a Pydantic model** (`AnswerDraft`), and its JSON schema is generated from it with `$defs` inlined, rather than a hand-written dict.
+  - **Two checks in code can overrule the model's verdict**, because a self-check can be optimistic: a factual sentence citing nothing, and a sentence citing a passage id that was never shown. Both are facts about the output, not judgements, so they are decided deterministically. Output that cannot be parsed is flagged `groundedness_failed` rather than shown as checked, and `grounded` defaults to false when the model omits it.
+  - **The introductory sentence is written in code**, from the recorded answer: it says the documents do not cover the question when the answer is unanswerable, and warns when the answer is ungrounded or flagged. The turn therefore ends when a document tool answers, and the prompt tells the agent to do any task or member work first and call a document tool last.
+  - **The agent loop uses Claude's native tool calling.** The model is given the tools and returns a real tool call with validated arguments, instead of describing one inside a JSON envelope.
+- **Why the loop changed.** Two live failures, neither visible in the tests:
+  - The JSON envelope marked only `action` as required, and Claude omitted the rest. It returned `{"response": "..."}` with no `action`, which the loop read as a tool call with no tool. Every step was spent that way and the turn ended with "let me search the documents" having searched nothing.
+  - Requiring every field instead made it worse: forced to fill a `response` field, the model wrote an intention to call a tool and then answered with it. Native tool calling removes the choice, because a call and a reply are different kinds of output rather than two shapes of the same JSON.
+- **Consequences.**
+  - A document question costs **2 model calls** instead of 4. Measured after the change: 1 routing call, then one answer call at about 4 s, and a follow-up question resolved correctly against the conversation.
+  - **Groundedness is now a self-assessment inside the same generation, which is weaker than an independent pass.** A model that hallucinates a sentence is unlikely to flag it. The deterministic checks catch missing and invalid citations, not a fluent claim that a cited passage does not support. This is a real reduction in the strength of the guarantee behind non-negotiable 3, accepted for latency. `GROUNDEDNESS` results from before this change are not comparable with results after it.
+  - One turn now produces one checked answer, so the two-answers-per-turn cap is effectively one. Compound requests work only if the task tool is called before the document tool, which the prompt now requires.
+  - A provider without native tool calling (Gemini) keeps the JSON-decision path, which is still tested.
+  - Verified: `pytest` 174 passed, including the native tool path, plain text not being mistaken for a broken call, the last step offering no tools, the turn ending at a document tool, and a flagged answer being introduced with a warning. Live: the follow-up "what can the third one do?" resolved to "What can the Technician role do?" and called the tool, which it did not before.

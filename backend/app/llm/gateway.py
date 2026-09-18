@@ -104,10 +104,26 @@ class _RateWindow:
 
 
 @dataclass(frozen=True)
+class ToolCall:
+    """A tool the model asked for, with arguments it already validated."""
+
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass(frozen=True)
 class Generation:
     text: str
     model: str
     cached: bool = False
+    # Set when the model chose a tool instead of replying (native tool use).
+    tool_call: ToolCall | None = None
+
+
+@dataclass(frozen=True)
+class ProviderResult:
+    text: str
+    tool_call: ToolCall | None = None
 
 
 class _LRU:
@@ -140,9 +156,21 @@ def _normalise(vector: list[float]) -> list[float]:
 
 
 class GenerationProvider(Protocol):
+    # True when the provider can be given tools and will return a real tool call
+    # instead of asking the model to describe one in JSON (D-049).
+    supports_native_tools: bool
+
     async def generate(
-        self, *, model: str, system: str, parts: list[str], max_tokens: int, temperature: float, json_schema: dict | None
-    ) -> str: ...
+        self,
+        *,
+        model: str,
+        system: str,
+        parts: list[str],
+        max_tokens: int,
+        temperature: float,
+        json_schema: dict | None,
+        tools: list[dict] | None = None,
+    ) -> ProviderResult: ...
 
 
 class EmbeddingProvider(Protocol):
@@ -168,6 +196,8 @@ class GeminiProvider:
     """Gemini via the google-genai SDK."""
 
     _EMBED_BATCH = 100
+    # The agent loop falls back to asking for a JSON decision on this provider.
+    supports_native_tools = False
 
     def __init__(self, api_key: str, timeout_seconds: float, thinking_level: str):
         from google import genai
@@ -182,8 +212,16 @@ class GeminiProvider:
         )
 
     async def generate(
-        self, *, model: str, system: str, parts: list[str], max_tokens: int, temperature: float, json_schema: dict | None
-    ) -> str:
+        self,
+        *,
+        model: str,
+        system: str,
+        parts: list[str],
+        max_tokens: int,
+        temperature: float,
+        json_schema: dict | None,
+        tools: list[dict] | None = None,
+    ) -> ProviderResult:
         types = self._types
         config: dict[str, Any] = {
             "system_instruction": system,
@@ -206,7 +244,7 @@ class GeminiProvider:
             contents=[types.Content(role="user", parts=[types.Part.from_text(text=p) for p in parts])],
             config=types.GenerateContentConfig(**config),
         )
-        return (response.text or "").strip()
+        return ProviderResult(text=(response.text or "").strip())
 
     async def embed(self, *, model: str, texts: list[str], task: EmbedTask, dimensions: int) -> list[list[float]]:
         types = self._types
@@ -240,6 +278,7 @@ class ClaudeBedrockProvider:
     """
 
     RESPOND_TOOL = "respond"
+    supports_native_tools = True
 
     def __init__(
         self,
@@ -267,8 +306,16 @@ class ClaudeBedrockProvider:
         self._client = AsyncAnthropicBedrock(**options)
 
     async def generate(
-        self, *, model: str, system: str, parts: list[str], max_tokens: int, temperature: float, json_schema: dict | None
-    ) -> str:
+        self,
+        *,
+        model: str,
+        system: str,
+        parts: list[str],
+        max_tokens: int,
+        temperature: float,
+        json_schema: dict | None,
+        tools: list[dict] | None = None,
+    ) -> ProviderResult:
         request: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
@@ -281,7 +328,11 @@ class ClaudeBedrockProvider:
         # it: grading and the groundedness check run at 0.0 to stay deterministic.
         if self._sampling:
             request["extra_body"] = {"temperature": temperature}
-        if json_schema is not None:
+        if tools is not None:
+            # Real tools: the model either calls one or replies, and the two are
+            # different kinds of output rather than two shapes of the same JSON.
+            request["tools"] = tools
+        elif json_schema is not None:
             request["tools"] = [
                 {
                     "name": self.RESPOND_TOOL,
@@ -292,16 +343,25 @@ class ClaudeBedrockProvider:
             request["tool_choice"] = {"type": "tool", "name": self.RESPOND_TOOL}
 
         message = await self._client.messages.create(**request)
+        text = "".join(b.text for b in message.content if getattr(b, "type", None) == "text").strip()
+
+        if tools is not None:
+            for block in message.content:
+                if getattr(block, "type", None) == "tool_use":
+                    # Arguments come back parsed and schema-checked, so there is
+                    # no JSON string inside JSON for the model to get wrong.
+                    return ProviderResult(text=text, tool_call=ToolCall(name=block.name, arguments=dict(block.input)))
+            return ProviderResult(text=text)
 
         if json_schema is not None:
             for block in message.content:
                 if getattr(block, "type", None) == "tool_use" and block.name == self.RESPOND_TOOL:
-                    return json.dumps(block.input)
+                    return ProviderResult(text=json.dumps(block.input))
             # Forced tool use should make this unreachable; treat it as a failed
             # call so the chain tries the next model rather than returning prose
             # the caller would fail to parse.
             raise ModelError(f"generate:{model} returned no structured output")
-        return "".join(b.text for b in message.content if getattr(b, "type", None) == "text").strip()
+        return ProviderResult(text=text)
 
 
 class ModelGateway:
@@ -324,6 +384,10 @@ class ModelGateway:
         self._embeddings = _LRU(settings.response_cache_entries * 4)
         self._cooling: dict[str, float] = {}
         self._embed_window = _RateWindow(settings.embed_requests_per_minute, clock=clock, sleep=sleep)
+
+    @property
+    def supports_native_tools(self) -> bool:
+        return getattr(self._generation, "supports_native_tools", False)
 
     async def _with_retry(self, label: str, call, attempts: int = 3):
         delay = 0.8
@@ -363,10 +427,13 @@ class ModelGateway:
         max_tokens: int = 1024,
         temperature: float = 0.2,
         json_schema: dict | None = None,
+        tools: list[dict] | None = None,
     ) -> Generation:
         primary = self._settings.fast_model if fast else self._settings.answer_model
-        key = _key("generate", primary, system, parts, max_tokens, temperature, json_schema)
-        cached = self._responses.get(key)
+        key = _key("generate", primary, system, parts, max_tokens, temperature, json_schema, tools)
+        # A tool-calling step is not cached: the same prompt legitimately leads to
+        # a different tool once the work so far changes.
+        cached = None if tools is not None else self._responses.get(key)
         if cached is not None:
             return Generation(text=cached, model=model_label(primary), cached=True)
 
@@ -378,10 +445,11 @@ class ModelGateway:
         error: ModelError | None = None
         for model in order:
             try:
-                text = await self._with_retry(
+                result = await self._with_retry(
                     f"generate:{model}",
                     lambda model=model: self._generation.generate(
-                        model=model, system=system, parts=parts, max_tokens=max_tokens, temperature=temperature, json_schema=json_schema
+                        model=model, system=system, parts=parts, max_tokens=max_tokens,
+                        temperature=temperature, json_schema=json_schema, tools=tools,
                     ),
                     attempts=1,
                 )
@@ -390,11 +458,11 @@ class ModelGateway:
                 error = exc
                 continue
             self._cooling.pop(model, None)
-            if model == primary:
-                self._responses.put(key, text)
-            else:
+            if model == primary and tools is None:
+                self._responses.put(key, result.text)
+            elif model != primary:
                 log.warning("generate:%s unavailable, answered by %s", model_label(primary), model_label(model))
-            return Generation(text=text, model=model_label(model))
+            return Generation(text=result.text, model=model_label(model), tool_call=result.tool_call)
         raise error or ModelError(f"generate:{primary} failed")
 
     async def embed(self, texts: list[str], task: EmbedTask) -> list[list[float]]:

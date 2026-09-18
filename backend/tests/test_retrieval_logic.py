@@ -85,7 +85,7 @@ def test_generate_answer_sends_passages_only_as_user_turn_data(monkeypatch):
             if "check whether an answer" in system:
                 return Generation(text='{"grounded": true, "unsupported": []}', model="fake")
             return Generation(
-                text='{"answerable": true, "sentences": [{"text": "Six months.", "sources": [1]}]}', model="fake"
+                text='{"answerable": true, "sentences": [{"text": "Six months.", "sources": [1]}], "grounded": true, "unsupported": []}', model="fake"
             )
 
     monkeypatch.setattr(answer_module, "get_gateway", lambda: FakeGateway())
@@ -137,17 +137,19 @@ def test_compose_answer_places_markers_from_sources_before_final_punctuation():
 
 def test_gateway_falls_back_along_the_chain_and_skips_a_cooling_model():
     from app.core.config import get_settings
-    from app.llm.gateway import ModelGateway, model_label
+    from app.llm.gateway import ModelGateway, ProviderResult, model_label
 
     settings = get_settings()
     calls: list[str] = []
 
     class QuotaProvider:
+        supports_native_tools = False
+
         async def generate(self, *, model, **_):
             calls.append(model)
             if model == settings.answer_model:
                 raise RuntimeError("429 RESOURCE_EXHAUSTED. Please retry in 46.08s.")
-            return f"from {model}"
+            return ProviderResult(text=f"from {model}")
 
         async def embed(self, **_):
             return []
@@ -322,14 +324,14 @@ def test_claude_structured_output_uses_forced_tool_use(monkeypatch):
     provider, sent = _claude_provider(monkeypatch, message)
     schema = {"type": "object", "properties": {"verdict": {"type": "string"}}, "required": ["verdict"]}
 
-    text = asyncio.run(
+    result = asyncio.run(
         provider.generate(
             model="arn:example", system="judge passages", parts=["<question>q</question>", "<workspace_documents>d</workspace_documents>"],
             max_tokens=40, temperature=0.0, json_schema=schema,
         )
     )
 
-    assert json.loads(text) == {"verdict": "good"}
+    assert json.loads(result.text) == {"verdict": "good"}
     assert sent["tool_choice"] == {"type": "tool", "name": "respond"}
     assert sent["tools"][0]["input_schema"] == schema
     # Non-negotiable 2: the system instruction stays its own argument, and the
@@ -346,11 +348,11 @@ def test_claude_returns_text_when_no_schema_is_asked_for(monkeypatch):
     message = _Block(content=[_Block(type="text", text="  rewritten query  ")])
     provider, sent = _claude_provider(monkeypatch, message)
 
-    text = asyncio.run(
+    result = asyncio.run(
         provider.generate(model="arn:example", system="s", parts=["p"], max_tokens=60, temperature=0.3, json_schema=None)
     )
 
-    assert text == "rewritten query"
+    assert result.text == "rewritten query"
     assert "tools" not in sent and "tool_choice" not in sent
     # The gateway owns retries and deadlines, so the SDK must not retry as well.
     assert sent["_options"]["max_retries"] == 0
