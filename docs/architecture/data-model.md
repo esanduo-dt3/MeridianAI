@@ -30,7 +30,7 @@ erDiagram
 `id` · `name` (1–80 chars) · `owner_id` · `created_at`
 
 **`workspace_members`**. One row per person per workspace.
-`id` · `workspace_id` · `user_id` · `auth_role` (`Admin` or `Member`) · `team_role` (nullable, SHOULD scope) · `joined_at`
+`id` · `workspace_id` · `user_id` · `auth_role` (`Admin` or `Member`) · `team_role` (nullable, 1–80 chars, free text; what the person does on the team, read by the agent when proposing an assignee, [D-047](../decisions.md#d-047)) · `joined_at`
 
 **`workspace_invites`** ([D-007](../decisions.md#d-007)). At most one pending invite per email per workspace.
 `id` · `workspace_id` · `email` · `auth_role` · `invited_by` · `created_at` · `accepted_at`

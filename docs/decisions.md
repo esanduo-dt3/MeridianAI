@@ -53,6 +53,7 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-044](#d-044) | Injection red-team suite: 7 of 8 caught; subtle factual poisoning was obeyed | Accepted | Owner | 2026-09-17 |
 | [D-045](#d-045) | Deploy both services on Railway, not Vercel | Accepted | Owner | 2026-09-17 |
 | [D-046](#d-046) | Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini | Accepted | Owner | 2026-09-18 |
+| [D-047](#d-047) | Team roles are free text, set by an Admin, and the agent proposes an assignee from them | Accepted | Owner | 2026-09-18 |
 
 ---
 
@@ -713,3 +714,22 @@ Each of these closes a gap the UI or the guardrails need.
   - `agent_answers.model` holds Claude labels from now on; rows written before this change keep their Gemini model names, and the pipeline health view groups by whatever was recorded.
   - The latency and quality figures in [D-038](#d-038) and [D-043](#d-043) were measured on Gemini and are **not** comparable with runs after this change. The golden set should be re-run on Claude before any latency or quality claim is repeated.
   - Verified: `pytest` 157 passed, including new tests that a schema becomes a forced tool call, that document text never enters the system instruction on this provider, that a missing structured result fails so the chain moves on, and that ARNs shorten to readable labels. **Not yet verified live against Bedrock.**
+
+## D-047
+
+**Team roles are free text, set by an Admin, and the agent proposes an assignee from them**
+
+- **Context.** Automatic task assignment is SHOULD scope in the PRD: "agent reads `workspace_members`' team role and proposes an assignee, reasoning shown". `workspace_members.team_role` has existed since the core schema ([D-011](#d-011)) but nothing wrote or read it. Both build gates have passed, so the owner picked this SHOULD item up.
+- **Decision.**
+  - **`team_role` is free text**, 1 to 80 characters, not an enum. Every team names its functions differently, and the agent matches the role against the task's wording semantically, so a fixed list would only get in the way.
+  - **It never grants permissions.** `auth_role` (Admin or Member) remains the only thing that decides what a person may do, exactly as in [D-006](#d-006). `team_role` describes what they do on the team.
+  - **Only an Admin sets it**, on the Members page, through the existing `PATCH /admin/members/{member_id}`, which now accepts `auth_role`, `team_role`, or both. The PRD's SHOULD-tier `GET /admin/team` and `POST /admin/team/{user_id}/role` are **not** added: the roster and the role write already exist on the members routes, and a second pair of paths for the same two operations would be a parallel API to keep in step. Sending an empty `team_role` clears it.
+  - **The change is audited** as `member.team_role_changed`, separately from `member.role_changed`, so a permission change and a description change are never confused in the audit log.
+  - **The agent reads it through `list_members`**, which now prints each person's team role, or "not set". The system prompt tells the agent: use the person the user names; otherwise propose the member whose team role best fits the work and say in `reasoning` which team role it matched and why; if no team role fits or none are set, leave the task unassigned and say so rather than guessing.
+  - **Assignment stays a proposal.** The agent still cannot write a task ([D-039](#d-039)); the assignee rides along in the proposed payload, and the Admin who approves sees the reasoning and can reject it.
+- **Why.** The reasoning requirement is what makes this inspectable rather than a guess with a name attached, which is the same standard the rest of the product holds itself to. Leaving it unassigned when nothing fits is better than a confident wrong assignment that an Admin has to notice and undo.
+- **Consequences.**
+  - Migration `20260918090000_team_roles` adds the length constraint and documents the column. No row is changed: every existing member simply has no team role until an Admin sets one.
+  - Members see each other's team roles; only Admins can edit them.
+  - Whether the model picks sensible people is not proven by these tests, only that the data reaches it and that a proposal carries the assignee and the reasoning. It needs a live check before the demo.
+  - Verified: `pytest` 159 passed, including that `list_members` prints team roles and "not set", and that a proposal carries an assignee plus reasoning and still writes no task. Frontend typecheck, lint and build pass.
