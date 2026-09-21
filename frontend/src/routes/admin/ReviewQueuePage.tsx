@@ -77,7 +77,7 @@ function Queue() {
       )}
       {recent.length > 0 && (
         <Section title="Recent decisions" count={recent.length}>
-          <ul className="divide-y divide-rule rounded-(--radius-panel) border border-rule bg-surface">
+          <ul className="surface-card divide-y divide-rule overflow-hidden">
             {recent.map((d) => (
               <DecisionRow key={`${d.kind}-${d.target_id}`} decision={d} />
             ))}
@@ -92,8 +92,9 @@ function Section({ title, count, children }: { title: string; count: number; chi
   if (count === 0) return null
   return (
     <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-rule bg-paper p-3 sm:p-4">
-      <h2 className="text-sm font-semibold text-ink">
-        {title} <span className="font-sans text-base font-normal text-ink-3">· {count}</span>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+        {title}
+        <span className="rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-2 tabular">{count}</span>
       </h2>
       {children}
     </section>
@@ -223,7 +224,7 @@ const DECISION_STYLE: Record<RecentDecision['decision'], string> = {
 
 function DecisionRow({ decision }: { decision: RecentDecision }) {
   return (
-    <li className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+    <li className="row-interactive flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
       <span className={`w-fit rounded-full px-2 py-0.5 text-xs font-medium capitalize ${DECISION_STYLE[decision.decision]}`}>
         {decision.decision}
       </span>

@@ -149,7 +149,7 @@ function MemberList({ members }: { members: Member[] }) {
       <h2 id="members-heading" className="mb-3 text-sm font-medium text-ink-2">
         {members.length} {members.length === 1 ? 'member' : 'members'}
       </h2>
-      <ul className="divide-y divide-rule overflow-hidden rounded-(--radius-panel) border border-rule bg-surface">
+      <ul className="surface-card divide-y divide-rule overflow-hidden">
         {members.map((member) => (
           <MemberRow key={member.id} member={member} isSelf={member.user_id === user?.id} canManage={isAdmin} />
         ))}
@@ -206,7 +206,7 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
   })
 
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-3 px-4 py-3 sm:px-5">
+    <li className="row-interactive flex flex-wrap items-center gap-x-3 gap-y-3 px-4 py-3 sm:px-5">
       <Avatar name={member.profile.full_name} email={member.profile.email} src={member.profile.avatar_url} size={36} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-ink">
@@ -302,7 +302,7 @@ function InviteList({ invites }: { invites: Invite[] }) {
       </h2>
       <ul className="divide-y divide-rule overflow-hidden rounded-(--radius-panel) border border-dashed border-rule-strong">
         {invites.map((invite) => (
-          <li key={invite.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
+          <li key={invite.id} className="row-interactive flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
             <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sunken text-ink-3">
               <EnvelopeSimple aria-hidden size={17} weight="bold" />
             </span>
