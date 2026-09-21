@@ -18,14 +18,22 @@ export function OperationalHeader({
   actions,
   className = '',
 }: OperationalHeaderProps) {
-  /** Renders route identity, concise status, and primary view actions for operational workspaces. */
+  /**
+   * Renders route identity, concise status, and primary view actions for
+   * operational workspaces.
+   *
+   * The header is a floating liquid-glass bar that sticks below the app chrome
+   * while the route content scrolls underneath it, so the page title and its
+   * primary actions stay reachable. The material is the shared
+   * `.liquid-glass` definition; no local blur or opacity values are used.
+   */
   return (
-    <header className={`flex flex-col gap-4 border-b border-rule pb-5 lg:flex-row lg:items-end lg:justify-between ${className}`}>
-      <div className="min-w-0 max-w-[72ch]">
+    <header
+      className={`liquid-glass sticky top-3 z-20 flex flex-col gap-4 rounded-[18px] px-5 py-4 lg:top-4 lg:flex-row lg:items-end lg:justify-between ${className}`}
+    >
+      <div className="max-w-[72ch] min-w-0">
         {eyebrow && (
-          <div className="mb-1 text-xs font-medium tracking-[0.08em] text-ink-3 uppercase">
-            {eyebrow}
-          </div>
+          <div className="mb-1 text-xs font-medium tracking-[0.08em] text-ink-3 uppercase">{eyebrow}</div>
         )}
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-display text-[27px] leading-tight font-semibold tracking-[-0.03em] text-ink sm:text-[30px]">

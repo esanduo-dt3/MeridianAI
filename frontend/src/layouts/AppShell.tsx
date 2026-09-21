@@ -102,23 +102,31 @@ export function AppShell() {
         Skip to content
       </a>
 
-      {/* Desktop sidebar: glass material from the shared tokens, never local opacity or blur values. */}
-      <aside className="sticky top-0 hidden h-dvh overflow-hidden border-r border-[var(--glass-edge)] bg-[var(--glass-surface)] backdrop-blur-[var(--glass-blur)] lg:block">
-        <Sidebar layoutGroup="desktop" collapsed={railCollapsed} onToggleCollapse={toggleRail} />
+      {/*
+        Desktop sidebar: a floating liquid-glass panel inset from the viewport
+        edges. The material comes from the shared `.liquid-glass` definition so
+        no local opacity or blur values are invented here.
+      */}
+      <aside className="sticky top-0 hidden h-dvh p-3 lg:block">
+        <div className="liquid-glass flex h-full flex-col overflow-hidden rounded-[20px]">
+          <Sidebar layoutGroup="desktop" collapsed={railCollapsed} onToggleCollapse={toggleRail} />
+        </div>
       </aside>
 
-      {/* Mobile top bar */}
-      <div className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-rule bg-paper/90 px-4 backdrop-blur lg:hidden">
-        <Wordmark size="sm" />
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open navigation"
-          aria-expanded={drawerOpen}
-          className="grid size-11 cursor-pointer place-items-center rounded-lg text-ink-2 hover:bg-sunken"
-        >
-          <List size={22} weight="bold" />
-        </button>
+      {/* Mobile top bar: the same floating glass material, as a rounded bar. */}
+      <div className="sticky top-0 z-30 px-3 pt-3 lg:hidden">
+        <div className="liquid-glass flex h-14 items-center justify-between rounded-[18px] pr-2 pl-4">
+          <Wordmark size="sm" />
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Open navigation"
+            aria-expanded={drawerOpen}
+            className="grid size-11 cursor-pointer place-items-center rounded-(--radius-control) text-ink-2 transition-colors duration-150 hover:bg-[var(--glass-raised)] hover:text-ink"
+          >
+            <List size={22} weight="bold" />
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
@@ -139,13 +147,13 @@ export function AppShell() {
               animate={reduce ? { opacity: 1 } : { x: 0 }}
               exit={reduce ? { opacity: 0 } : { x: '-100%' }}
               transition={{ type: 'spring', stiffness: 420, damping: 40 }}
-              className="absolute inset-y-0 left-0 w-[min(84vw,300px)] border-r border-rule bg-paper shadow-(--shadow-lift)"
+              className="liquid-glass absolute inset-y-3 left-3 w-[min(84vw,300px)] overflow-hidden rounded-[20px]"
             >
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 aria-label="Close navigation"
-                className="absolute top-3 right-3 grid size-11 cursor-pointer place-items-center rounded-lg text-ink-2 hover:bg-sunken"
+                className="absolute top-3 right-3 z-10 grid size-11 cursor-pointer place-items-center rounded-(--radius-control) text-ink-2 transition-colors hover:bg-[var(--glass-raised)] hover:text-ink"
               >
                 <X size={20} weight="bold" />
               </button>
@@ -256,7 +264,9 @@ function NavGroup({ label, items, layoutGroup, onNavigate, collapsed = false }: 
                 `group relative flex min-h-10 items-center rounded-(--radius-control) text-[14.5px] transition-colors duration-150 ${
                   collapsed ? 'justify-center px-0' : 'gap-3 px-3'
                 } ${
-                  isActive ? 'bg-surface font-medium text-ink shadow-(--shadow-hairline)' : 'text-ink-2 hover:bg-sunken hover:text-ink'
+                  isActive
+                    ? 'bg-[var(--glass-raised)] font-medium text-ink shadow-(--shadow-hairline)'
+                    : 'text-ink-2 hover:bg-[var(--glass-raised)] hover:text-ink'
                 }`
               }
             >
