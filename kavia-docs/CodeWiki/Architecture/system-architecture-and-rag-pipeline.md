@@ -4,7 +4,9 @@
 
 ## Scope and Evidence
 
-MeridianAI is a workspace-scoped application that combines a React frontend, a FastAPI backend, Supabase authentication and storage, PostgreSQL with pgvector, a Gemini model gateway, and Voyage cross-encoder reranking. This document describes the implemented application, document ingestion, retrieval, answer generation, interactive agent tools, and administrative oversight.
+MeridianAI is a workspace-scoped application that combines a React frontend, a FastAPI backend, Supabase authentication and storage, PostgreSQL with pgvector, a two-provider model gateway, and Voyage cross-encoder reranking. Generation runs by default on Claude through Amazon Bedrock, while embeddings remain on Gemini; the gateway can be switched back to Gemini generation with a single setting. This document describes the implemented application, document ingestion, retrieval, answer generation, interactive agent tools, and administrative oversight.
+
+The frontend is documented separately in [Frontend UI Architecture](frontend-ui-architecture.md), which covers the application shell, the page-frame system, the design tokens, and the public landing page.
 
 A workspace is the principal security and retrieval namespace. Documents, chunks, embeddings, retrieval runs, answers, tasks, and proposals carry workspace identifiers. Citations inherit their access boundary through their related answers and chunks rather than carrying a separate workspace column. Backend handlers resolve membership before workspace-scoped work proceeds, and database reads using the caller's access token remain subject to row-level security.
 
@@ -14,7 +16,9 @@ The existing [architecture overview](../../../docs/architecture/overview.md), [d
 
 The frontend is a React single-page application. `frontend/src/App.tsx` composes providers for theme, React Query, Supabase authentication, routing, and workspace selection. It exposes documents, the assistant, notes, tasks, workspace membership, and administrative review, audit, and pipeline-health pages.
 
-The backend is assembled in `backend/app/main.py`. Its routers include workspace and membership management, document lifecycle operations, notes and tasks, direct question answering, agent chat, agent-action approval, administrative review, audit, and health endpoints. CORS permits configured frontend origins and accepts bearer authorization and the `X-Workspace-Id` scope header. Security-header middleware wraps API responses.
+The backend is assembled in `backend/app/main.py`. Its routers include workspace and membership management, tasks, sprint planning, document lifecycle operations, notes, direct question answering, agent chat, agent-action approval, administrative review, audit, and health endpoints. CORS permits configured frontend origins and accepts bearer authorization and the `X-Workspace-Id` scope header. Security-header middleware wraps API responses.
+
+Two capabilities originally deferred to the SHOULD tier have since been built. Workspace members can carry a free-text `team_role`, which only an Admin may set and which is audited, and which the agent reads through its member tool when suggesting an assignee. Tasks can be organised into sprints through `backend/app/api/sprints.py`, where listing is open to members and creation, modification, and deletion are Admin-only; a task with a null sprint is in the backlog.
 
 Supabase Auth issues access tokens. Supabase Storage keeps source files in the private `documents` bucket. PostgreSQL stores application and retrieval records. pgvector supplies the dense index, while a PostgreSQL GIN text-search index supplies the lexical leg. Both indexes reside in the same database; there is no separate vector-database service in this implementation.
 
@@ -26,7 +30,7 @@ flowchart LR
     Storage["Private documents bucket"]
     DB["PostgREST and PostgreSQL with RLS"]
     Indexes["pgvector HNSW and lexical GIN indexes"]
-    Gemini["Gemini generation and embeddings"]
+    Gemini["Claude on Bedrock generation and Gemini embeddings"]
     Voyage["Voyage rerank-2.5"]
 
     Browser -->|"Session management"| Auth
@@ -85,7 +89,7 @@ flowchart TB
             SAVE["Persist run, answer, citations and audit"]
         end
 
-        GATEWAY["Gemini gateway: caches, pacing, deadlines and fallback"]
+        GATEWAY["Model gateway: caches, pacing, deadlines and fallback"]
     end
 
     subgraph supabase["Supabase"]
@@ -97,7 +101,7 @@ flowchart TB
         TRACE["Runs, answers, citations, audit_log and admin_reviews"]
     end
 
-    GEMINI["Google Gemini generation and embeddings"]
+    GEMINI["Claude on Amazon Bedrock generation; Gemini embeddings"]
     VOYAGE["Voyage rerank-2.5"]
 
     UI --> AUTH
@@ -179,7 +183,7 @@ A direct question enters the shared RAG pipeline immediately. An interactive mes
 
 The RAG pipeline searches document chunks. Notes remain an application feature but are not an additional retrieval source in this path. Tasks and members are read through dedicated tools rather than embedded into the document index. The registered agent tool set contains no web browser, shell execution, note-editing, or direct task-approval tool.
 
-Gemini handles embeddings and generation through the gateway. Voyage uses a separate reranker client. Depending on the stage, external calls can contain query text, document passages, or tool-derived information. Workspace authorization is enforced before these calls, not by the external providers.
+The gateway handles both generation and embeddings, routing generation to Claude on Amazon Bedrock and embeddings to Gemini. Voyage uses a separate reranker client. Depending on the stage, external calls can contain query text, document passages, or tool-derived information. Workspace authorization is enforced before these calls, not by the external providers.
 
 ### Runtime and Persistence Boundaries
 
@@ -279,9 +283,11 @@ Each embedding batch permits up to five total attempts. Per-minute quota errors 
 
 ## Interactive Agent Tools and Human Approval
 
-`build_tools` in `backend/app/agent/tools.py` binds seven LangChain `StructuredTool` instances to the current workspace, user database client, service client, date, and turn state. `run_agent` in `backend/app/agent/loop.py` asks the fast Gemini model for one JSON decision at a time: call a registered tool or respond.
+`build_tools` in `backend/app/agent/tools.py` binds seven LangChain `StructuredTool` instances to the current workspace, user database client, service client, date, and turn state. `run_agent` in `backend/app/agent/loop.py` drives the turn one decision at a time using the configured fast model: call a registered tool, or respond.
 
-The tools are not exposed as native operational tools on the separate document-answer model call. The agent loop publishes their schemas to its decision prompt, parses the returned decision, validates arguments through the tool, and invokes it in Python.
+The loop adapts to the provider. It reads `supports_native_tools` on the gateway; with Claude on Bedrock the tool schemas are given to the model as native tools and the returned tool call is used directly, while a provider without native tool use is asked for a single JSON decision object instead. In both cases the tool is resolved and its arguments validated in Python before it runs, so the model never executes anything itself.
+
+The tools are not exposed on the separate document-answer model call. That call has no operational tools bound to it at all, which is what keeps retrieved document text from being able to trigger an action.
 
 | Tool | Implemented behavior | Access and side effects |
 | --- | --- | --- |
@@ -480,7 +486,7 @@ The maximum tuple wins. Two attempts means one retry, not two retries. The resul
 
 `generate_answer` in `backend/app/rag/answer.py` returns a deterministic refusal when no passages exist. It supplies no citations, zero confidence, `grounded = true`, and a `no_supporting_passages` flag. No answer-model call is needed for that branch.
 
-With passages, the default answer model is `gemini-3.5-flash`. It receives the constant `ANSWER_SYSTEM` and separate user-turn parts containing the escaped question and rendered evidence. The request uses a 1500-token output limit, temperature 0.2, and a JSON schema requiring `answerable` and sentence objects with text and supporting source identifiers.
+With passages, the answer is written by the configured answer model, which is a Claude model on Amazon Bedrock by default and a Gemini model when the gateway is switched to Gemini generation. It receives the constant `ANSWER_SYSTEM` and separate user-turn parts containing the escaped question and rendered evidence. The request uses a 1500-token output limit, a low temperature, and a schema derived from the `AnswerDraft` Pydantic model, which requires an answerable flag, sentence objects carrying text and supporting source identifiers, the model's own groundedness verdict, and any sentences it considers unsupported. On Bedrock the schema is enforced through forced tool use, so the model must reply with one validated tool call.
 
 ```mermaid
 flowchart TD
@@ -491,7 +497,7 @@ flowchart TD
     MODEL --> COMPOSE["Compose sentences and source markers"]
     COMPOSE --> REDACT["Redact recognizable secrets"]
     REDACT --> CITE["Drop invalid IDs and renumber citations"]
-    CITE --> GROUND["Check support using cited passages"]
+    CITE --> GROUND["Apply the model verdict and recheck uncited sentences"]
     GROUND --> SCORE["Compute uncalibrated confidence and flags"]
     REFUSE --> SAVE["Persist run, answer, citations and audit"]
     SCORE --> SAVE
@@ -510,11 +516,11 @@ These checks are safeguards, not a proof that every answer is correct. A model c
 
 No operational tools are bound to the document-answer generation request. The separate agent decision loop treats tool outputs as data and enforces the proposal restrictions described above. Pattern detection and redaction are limited safeguards, not comprehensive prevention of every possible injection or secret format.
 
-### Groundedness Check
+### Groundedness Verdict
 
-After formatting citations, the fast model checks the answer against only its cited chunks. It returns structured `grounded` and `unsupported` fields. An unreadable JSON verdict results in `grounded = false` and an explanatory unsupported-claim entry.
+Groundedness is no longer a separate model call. The answer model returns `grounded` and `unsupported` as part of the same structured response that carries the answer, which halves the number of model calls per question from four to two: one routing decision and one answer. This is a deliberate latency and quota trade-off recorded as decision `D-049`, and it weakens the guarantee, because a model's self-assessment of its own output is less independent than a separate check against the cited passages alone.
 
-When there are no citations, `check_grounded` returns true without a model call. That supports refusals, but it also means groundedness alone cannot validate an uncited factual response. An answer marked answerable without valid citations receives a separate `no_citations` flag.
+Application code does not take the verdict on trust. `unsupported_sentences` re-reads the returned sentences and treats a sentence that cites no valid source as unsupported regardless of what the model claimed, and the final `grounded` value is the model's verdict combined with that check. An unreadable or invalid structured response is not treated as a grounded answer: the text is returned with `grounded` false and a `groundedness_failed` flag. An answer marked answerable without valid citations receives a separate `no_citations` flag.
 
 ### Confidence Value and Flags
 
@@ -534,15 +540,19 @@ Flagged answers are not hidden. They are returned, persisted, and made available
 
 ## Model Gateway Behavior
 
-All Gemini calls use `ModelGateway` in `backend/app/llm/gateway.py`. It centralizes exact-request response caching, embedding caching, provider calls, deadlines, fallback models, cooldowns, and normalized error types.
+All model calls use `ModelGateway` in `backend/app/llm/gateway.py`. It centralizes exact-request response caching, embedding caching, provider calls, deadlines, fallback models, cooldowns, and normalized error types, and it holds two providers rather than one: a generation provider and an embedding provider.
 
-Default generation models are `gemini-3.5-flash` for document answers and `gemini-3.5-flash-lite` for agent decisions, query rewriting, grading, and groundedness. The default fallback list contains `gemini-3-flash-preview`. The effective chain is the requested model, configured fallbacks, and then the other configured primary/fast model, with duplicates removed.
+`GENERATION_PROVIDER` selects the generation provider and defaults to `bedrock`. `ClaudeBedrockProvider` wraps the Anthropic `AsyncAnthropicBedrock` client, addresses models by inference-profile ARN or plain Bedrock model identifier through `BEDROCK_ANSWER_MODEL` and `BEDROCK_FAST_MODEL`, and obtains structured output by forcing a single tool call. Sampling settings are sent only when `BEDROCK_SAMPLING` is enabled, because newer Claude models reject them outright. `GeminiProvider` remains available for generation when the provider is set to `gemini`, and is always used for embeddings, since Claude has no embedding model and re-embedding the corpus would invalidate every stored vector. This split is recorded as decision `D-046`.
+
+The answer model writes document answers, and the cheaper fast model handles agent decisions, query rewriting, and retrieval grading. The gateway exposes `supports_native_tools` so the agent loop can use native tool calling where the provider offers it. The effective fallback chain for a generation request is the requested model, the configured fallbacks for the active provider, and then the other configured model of that provider, with duplicates removed.
 
 The default 15-second generation timeout applies per attempted model call, not to an entire chat turn or the complete fallback chain. Each model is tried once in a generation request. Failure places that model on cooldown for a provider-specified retry duration or the default 120 seconds, capped at one hour. If all models are cooling down, the gateway tries the one expected to recover first.
 
 Only successful primary-model responses enter the generation cache. Cache keys include exact system prompt, user parts, schema, temperature, output limit, and primary model. The actual successful model name is returned and persisted.
 
 Embeddings have their separate five-attempt retry path, a longer per-attempt timeout, input pacing, and no model fallback. Response caches, embedding caches, model cooldowns, and pacing windows are process-local and reset on restart.
+
+One operational caveat is recorded in the decision log rather than in the code: the demonstration AWS principal authenticates but has not been granted `bedrock:InvokeModel`, so a live Bedrock generation had not yet succeeded when that decision was written. The earlier measured evaluation results, including the gate G1 run and its latency figures, were produced on the previous Gemini generation path and have not been re-measured on Claude.
 
 ## Persistence, Traceability, and UI Behavior
 
@@ -605,7 +615,8 @@ The following exact excerpts anchor the diagrams to current implementation. Path
 | Parallel retrieval | `backend/app/rag/retrieval.py`, `hybrid_search` | `dense_rows, sparse_rows = await asyncio.gather(` |
 | Best attempt | `backend/app/rag/retrieval.py`, `agentic_retrieve` | `best = max(attempts, key=rank)` |
 | Answer isolation | `backend/app/rag/answer.py`, `generate_answer` | `system=ANSWER_SYSTEM,` and `parts=[question_part(question), render_passages(chunks)],` |
-| Citation support | `backend/app/rag/answer.py`, `generate_answer` | `grounded, unsupported = await check_grounded(answer, citations)` |
+| Citation support | `backend/app/rag/answer.py`, `generate_answer` | `grounded = data.grounded and not broken` |
+| Forced structured output | `backend/app/llm/gateway.py`, `ClaudeBedrockProvider.generate` | `request["tool_choice"] = {"type": "tool", "name": self.RESPOND_TOOL}` |
 | Tool dispatch | `backend/app/agent/loop.py`, `run_agent` | `output = str(await tool.ainvoke(arguments))` |
 | Pending proposal | `backend/app/agent/tools.py`, nested `propose_task` | `row = await ctx.service.insert("agent_actions", {` |
 | Admin action | `backend/app/api/agent_actions.py`, `approve` | `await service.rpc("approve_agent_action", {"action_id": action_id, "approver_id": context.user_id})` |
@@ -650,7 +661,7 @@ The current architecture and diagrams are grounded in the following implementati
 | Group | Source files |
 | --- | --- |
 | Application and browser request flow | `frontend/src/App.tsx`, `frontend/src/lib/api.ts`, `frontend/src/routes/AssistantPage.tsx`, `frontend/src/agent/useAgentChat.ts`, `frontend/src/agent/AnswerPanel.tsx` |
-| Backend entry and APIs | `backend/app/main.py`, `backend/app/api/documents.py`, `backend/app/api/ask.py`, `backend/app/api/agent_chat.py`, `backend/app/api/agent_actions.py`, `backend/app/api/tasks.py`, `backend/app/api/admin.py` |
+| Backend entry and APIs | `backend/app/main.py`, `backend/app/api/documents.py`, `backend/app/api/ask.py`, `backend/app/api/agent_chat.py`, `backend/app/api/agent_actions.py`, `backend/app/api/tasks.py`, `backend/app/api/sprints.py`, `backend/app/api/members.py`, `backend/app/api/admin.py` |
 | Agent | `backend/app/agent/loop.py`, `backend/app/agent/tools.py` |
 | Shared infrastructure | `backend/app/core/config.py`, `backend/app/core/security.py`, `backend/app/core/workspace.py`, `backend/app/core/supabase.py`, `backend/app/core/storage.py`, `backend/app/core/audit.py`, `backend/app/core/ratelimit.py`, `backend/app/core/security_headers.py` |
 | Parsing and ingestion | `backend/app/rag/documents.py`, `backend/app/rag/parse.py`, `backend/app/rag/parsers/pdf.py`, `backend/app/rag/parsers/docx.py`, `backend/app/rag/chunker.py`, `backend/app/rag/ingest.py` |
@@ -661,3 +672,5 @@ The current architecture and diagrams are grounded in the following implementati
 | Retrieval indexes and initial RPCs | `supabase/migrations/20260916090000_ingestion_retrieval.sql` |
 | Ingestion progress and effective search RPCs | `supabase/migrations/20260916130000_ingestion_progress.sql` |
 | Answer review transaction | `supabase/migrations/20260916180000_answer_reviews.sql` |
+| Team roles on members | `supabase/migrations/20260918090000_team_roles.sql` |
+| Backlog and sprints | `supabase/migrations/20260918100000_sprints.sql` |

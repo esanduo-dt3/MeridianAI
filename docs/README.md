@@ -28,7 +28,7 @@ Meridian is an AI-native workspace where every AI answer cites the exact passage
 
 - **`Meridian_PRD_v2.pdf`** is the product requirements. Where this documentation differs, [decisions.md](decisions.md) records the approved change.
 - **`kavia-docs/projectContext.md`** holds the Week 1 non-negotiables and MUST scope, as given to the build.
-- **`kavia-docs/`** is the record of the first build attempt with Kavia AI: its scaffold plan, PRD summary and the kickoff prompts. It is kept for reference and is no longer maintained. See [D-001](decisions.md#d-001).
+- **`kavia-docs/`** holds the Kavia-assisted record: the original scaffold plan, the PRD summary and the kickoff prompts from the first build attempt ([D-001](decisions.md#d-001)), plus the CodeWiki written during the later UI/UX work. Its entry point is `kavia-docs/CodeWiki/index.md`. The architecture and frontend pages there are kept in sync with the code; the plans and audits under `kavia-docs/CodeWiki/Artifacts/` are point-in-time records and are not updated after the fact.
 - **The code and migrations** are authoritative for current behaviour. These docs are updated in the same change as the code they describe.
 
 ## Writing these docs
