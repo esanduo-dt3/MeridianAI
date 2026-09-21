@@ -18,7 +18,27 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:5173"
     environment: Literal["local", "staging", "production", "test"] = "local"
 
-    # --- Model provider (behind app/llm/gateway.py, D-026) ---
+    # --- Generation provider: Claude on Amazon Bedrock (D-046) ---
+    # Generation moved to Claude; embeddings stay on Gemini because Claude has
+    # no embedding model and re-embedding every document would invalidate the
+    # stored vectors (D-046). Set to "gemini" to run generation on Gemini again.
+    generation_provider: Literal["bedrock", "gemini"] = "bedrock"
+    aws_region: str = "us-east-2"
+    # Omit both to let the AWS SDK resolve credentials itself (profile, instance role).
+    aws_access_key_id: SecretStr | None = None
+    aws_secret_access_key: SecretStr | None = None
+    # Inference-profile ARNs, or plain Bedrock model ids. Required when
+    # generation_provider is "bedrock".
+    bedrock_answer_model: str = ""       # answer generation (Sonnet)
+    bedrock_fast_model: str = ""         # grading, rewrite, groundedness, agent loop (Haiku)
+    bedrock_fallback_models: str = ""    # comma separated, tried before the other role's model
+    # Sonnet 4 and Haiku 4.5 accept temperature, and the pipeline relies on it:
+    # grading and the groundedness check run at 0.0 so they are deterministic.
+    # Newer Claude models (Sonnet 5, Opus 5 and later) reject sampling settings
+    # with a 400, so set this false if the model ARNs are changed to those.
+    bedrock_sampling: bool = True
+
+    # --- Embeddings, and generation when generation_provider is "gemini" (D-026) ---
     gemini_api_key: SecretStr | None = None
     gemini_answer_model: str = "gemini-3.5-flash"        # answer generation
     gemini_fast_model: str = "gemini-3.5-flash-lite"     # query rewrite, grading, groundedness
@@ -74,6 +94,20 @@ class Settings(BaseSettings):
     retrieval_max_attempts: int = 2
     # Answers below this uncalibrated confidence are flagged for admin review.
     review_confidence_threshold: float = 0.35
+
+    @property
+    def answer_model(self) -> str:
+        """The model that writes answers, for the configured generation provider."""
+        return self.bedrock_answer_model if self.generation_provider == "bedrock" else self.gemini_answer_model
+
+    @property
+    def fast_model(self) -> str:
+        """The cheaper model: grading, query rewriting, groundedness, the agent loop."""
+        return self.bedrock_fast_model if self.generation_provider == "bedrock" else self.gemini_fast_model
+
+    @property
+    def fallback_models(self) -> str:
+        return self.bedrock_fallback_models if self.generation_provider == "bedrock" else self.gemini_fallback_models
 
     @property
     def cors_origins(self) -> list[str]:

@@ -12,6 +12,7 @@ import { passageHref } from './answerModel'
   markers, the passages behind them, the uncalibrated confidence, the
   groundedness result, and the retrieval run that produced it.
 */
+// PUBLIC_INTERFACE
 export function AnswerPanel({ result }: { result: AskResponse }) {
   const [active, setActive] = useState<number | null>(null)
 
@@ -52,7 +53,7 @@ export function AnswerPanel({ result }: { result: AskResponse }) {
           <h2 className="font-mono text-[11px] tracking-wide text-ink-3 uppercase">
             {result.citations.length === 1 ? '1 cited passage' : `${result.citations.length} cited passages`}
           </h2>
-          <ol className="flex flex-col gap-2">
+          <ol className="grid grid-cols-1 gap-2 xl:grid-cols-2">
             {result.citations.map((citation) => (
               <CitationCard
                 key={`${citation.ordinal}-${citation.chunk_id}`}

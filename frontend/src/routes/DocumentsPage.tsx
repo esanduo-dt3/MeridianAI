@@ -18,7 +18,7 @@ import { ConfirmDialog } from '../components/Dialog'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState, Skeleton } from '../components/Feedback'
 import { SelectField } from '../components/Field'
-import { PageHeader } from '../components/PageHeader'
+import { OperationalHeader } from '../components/OperationalHeader'
 import { ProgressBar } from '../documents/IngestProgress'
 import { embeddingFraction, stageLabel } from '../documents/ingestState'
 import { useDocumentMutations, useDocuments } from '../documents/useDocuments'
@@ -31,16 +31,26 @@ const ACCEPT = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-office
 const MAX_BYTES = 25 * 1024 * 1024
 const dateFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
 
+/** Renders workspace document ingestion, status, inspection, and administration controls. */
+// PUBLIC_INTERFACE
 export function DocumentsPage() {
   const { active, workspaces } = useWorkspace()
   const docs = useDocuments()
   const adminWorkspaces = workspaces.filter((w) => w.auth_role === 'Admin')
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Workspace knowledge"
         title="Documents"
         description={`PDF and Word files in ${active?.name}, split into passages the agent can cite down to the character.`}
+        status={
+          docs.isSuccess ? (
+            <span className="rounded-full bg-sunken px-2.5 py-1 text-xs font-medium text-ink-2 tabular">
+              {docs.data.length} {docs.data.length === 1 ? 'document' : 'documents'}
+            </span>
+          ) : undefined
+        }
       />
 
       {adminWorkspaces.length > 0 && <UploadPanel />}
@@ -208,8 +218,8 @@ function DocumentList({ docs }: { docs: DocumentSummary[] }) {
           const inspectable = doc.chunk_count > 0 && doc.parsed_status !== 'pending'
           const embedding = doc.parsed_status === 'processing' && doc.processing_stage === 'embedding'
           return (
-            <li key={doc.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5 sm:px-5">
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-sunken text-ink-2">
+            <li key={doc.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sunken text-ink-2">
                 <Icon aria-hidden size={20} weight="duotone" />
               </span>
               <div className="min-w-0 flex-1">

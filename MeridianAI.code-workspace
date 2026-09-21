@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"name": "MeridianAI",
+			"path": "."
+		},
+		{
+			"name": "real test data",
+			"path": "../../real test data"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "MeridianAI"
+	}
+}

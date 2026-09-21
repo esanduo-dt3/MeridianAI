@@ -51,6 +51,11 @@ Every decision that shapes Meridian and is not stated verbatim in `Meridian_PRD_
 | [D-042](#d-042) | One Assistant: the agent chooses when to consult documents and which document tool to use | Accepted | Owner | 2026-09-17 |
 | [D-043](#d-043) | Real-document evaluation end to end through the agent, and the ingestion defects it exposed | Accepted | Owner | 2026-09-17 |
 | [D-044](#d-044) | Injection red-team suite: 7 of 8 caught; subtle factual poisoning was obeyed | Accepted | Owner | 2026-09-17 |
+| [D-045](#d-045) | Deploy both services on Railway, not Vercel | Accepted | Owner | 2026-09-17 |
+| [D-046](#d-046) | Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini | Accepted | Owner | 2026-09-18 |
+| [D-047](#d-047) | Team roles are free text, set by an Admin, and the agent proposes an assignee from them | Accepted | Owner | 2026-09-18 |
+| [D-048](#d-048) | Backlog and sprints: the backlog is the absence of a sprint, and planning is Admin-only | Accepted | Owner | 2026-09-18 |
+| [D-049](#d-049) | Fewer model calls per question: Haiku everywhere, native tool calls, and groundedness folded into the answer | Accepted | Owner | 2026-09-18 |
 
 ---
 
@@ -690,3 +695,88 @@ Each of these closes a gap the UI or the guardrails need.
   - Sign-in redirects to the frontend's origin, so its Railway URL must be in Supabase Auth's allowed redirect URLs.
   - Deploys are from the CLI for now; Railway can be connected to the GitHub repository later for deploys on push.
   - The PyMuPDF licence (D-024) applies once the service is public.
+
+## D-046
+
+**Generation moves to Claude on Amazon Bedrock; embeddings stay on Gemini**
+
+- **Context.** The owner was given AWS Bedrock access to Claude for the Meridian demo, with inference-profile ARNs for Claude Sonnet 4 and Claude Haiku 4.5 in `us-east-2`. Gemini's free tier had been the binding constraint on the build: a per-model daily request cap that forced a model chain and cooldowns ([D-032](#d-032)), latency that missed the PRD's p50 target at busy times, and fallback answers that made golden-set runs unfair to measure ([D-031](#d-031), [D-037](#d-037)).
+- **Decision.**
+  - **Generation runs on Claude on Bedrock.** `gemini-3.5-flash` is replaced by Claude Sonnet 4 for answers, and `gemini-3.5-flash-lite` by Claude Haiku 4.5 for grading, query rewriting, groundedness checks and the agent loop. The split of work between a strong and a fast model is unchanged.
+  - **Embeddings stay on Gemini** (`gemini-embedding-001`, 1536 dimensions). Claude has no embedding model, and vectors from any other model would not be comparable with the ones already stored, so moving them would mean a schema change and re-ingesting every document. The owner chose to keep them. `GEMINI_API_KEY` is therefore still required, for embeddings only.
+  - **Reranking stays on Voyage** `rerank-2.5`. The free-tier token cap recorded in [D-037](#d-037) still applies and is unchanged by this decision.
+  - **The Bedrock InvokeModel client** (`AsyncAnthropicBedrock` from the `anthropic` SDK) is used, not the Mantle client, because the account was given inference-profile ARNs and that client addresses models by ARN. The Mantle client names models by short id instead.
+  - **Structured output uses forced tool use.** Claude has no JSON-schema response mode as Gemini does. A caller's `json_schema` becomes a single tool the model is required to call, and the tool's validated input is returned as JSON text. Every caller keeps the same gateway contract, so nothing above `app/llm/gateway.py` changed.
+  - **The gateway now holds two providers**, one for generation and one for embedding, behind the same cache, model chain, cooldowns and 15-second deadline. `GENERATION_PROVIDER=gemini` switches generation back without touching code.
+  - **Answers record a readable model label**, `claude-sonnet-4` rather than the full ARN, so the review queue and pipeline health stay legible. The chain and cooldowns still key on the full ARN.
+- **Why.** Paid Bedrock capacity removes the free-tier daily caps that shaped [D-031](#d-031), [D-032](#d-032) and [D-037](#d-037), which is the largest single lever on both answer quality and the p50 latency target. Keeping embeddings on Gemini avoids re-embedding every document for no retrieval benefit.
+- **Consequences.**
+  - Two credentials are needed: AWS for generation, Gemini for embeddings.
+  - The model chain still exists, but it now protects against transient Bedrock errors rather than daily quota exhaustion. Cooldowns and the response cache are unchanged.
+  - `agent_answers.model` holds Claude labels from now on; rows written before this change keep their Gemini model names, and the pipeline health view groups by whatever was recorded.
+  - The latency and quality figures in [D-038](#d-038) and [D-043](#d-043) were measured on Gemini and are **not** comparable with runs after this change. The golden set should be re-run on Claude before any latency or quality claim is repeated.
+  - Verified: `pytest` 170 passed, including new tests that a schema becomes a forced tool call, that document text never enters the system instruction on this provider, that a missing structured result fails so the chain moves on, that ARNs shorten to readable labels, and that every parameter sent is one the installed SDK accepts.
+  - **Found when first run live (2026-09-18):** `anthropic` 1.6.0 has removed `temperature` from `messages.create()`, because the newest Claude models refuse sampling settings. Sonnet 4 and Haiku 4.5 still accept it, and the pipeline depends on it (grading and the groundedness check run at 0.0 to stay deterministic), so it is sent in the request body instead, behind `BEDROCK_SAMPLING` (default true; set it false if the model ARNs are changed to Sonnet 5 or Opus 5, which reject it).
+  - **Still blocked on AWS (2026-09-18):** the IAM user `meridian-bedrock-demo` authenticates, but has no `bedrock:InvokeModel` permission on any foundation model, through the inference profile or directly, so no live call has succeeded yet. The account owner has to attach that permission.
+
+## D-047
+
+**Team roles are free text, set by an Admin, and the agent proposes an assignee from them**
+
+- **Context.** Automatic task assignment is SHOULD scope in the PRD: "agent reads `workspace_members`' team role and proposes an assignee, reasoning shown". `workspace_members.team_role` has existed since the core schema ([D-011](#d-011)) but nothing wrote or read it. Both build gates have passed, so the owner picked this SHOULD item up.
+- **Decision.**
+  - **`team_role` is free text**, 1 to 80 characters, not an enum. Every team names its functions differently, and the agent matches the role against the task's wording semantically, so a fixed list would only get in the way.
+  - **It never grants permissions.** `auth_role` (Admin or Member) remains the only thing that decides what a person may do, exactly as in [D-006](#d-006). `team_role` describes what they do on the team.
+  - **Only an Admin sets it**, on the Members page, through the existing `PATCH /admin/members/{member_id}`, which now accepts `auth_role`, `team_role`, or both. The PRD's SHOULD-tier `GET /admin/team` and `POST /admin/team/{user_id}/role` are **not** added: the roster and the role write already exist on the members routes, and a second pair of paths for the same two operations would be a parallel API to keep in step. Sending an empty `team_role` clears it.
+  - **The change is audited** as `member.team_role_changed`, separately from `member.role_changed`, so a permission change and a description change are never confused in the audit log.
+  - **The agent reads it through `list_members`**, which now prints each person's team role, or "not set". The system prompt tells the agent: use the person the user names; otherwise propose the member whose team role best fits the work and say in `reasoning` which team role it matched and why; if no team role fits or none are set, leave the task unassigned and say so rather than guessing.
+  - **Assignment stays a proposal.** The agent still cannot write a task ([D-039](#d-039)); the assignee rides along in the proposed payload, and the Admin who approves sees the reasoning and can reject it.
+- **Why.** The reasoning requirement is what makes this inspectable rather than a guess with a name attached, which is the same standard the rest of the product holds itself to. Leaving it unassigned when nothing fits is better than a confident wrong assignment that an Admin has to notice and undo.
+- **Consequences.**
+  - Migration `20260918090000_team_roles` adds the length constraint and documents the column. No row is changed: every existing member simply has no team role until an Admin sets one.
+  - Members see each other's team roles; only Admins can edit them.
+  - Whether the model picks sensible people is not proven by these tests, only that the data reaches it and that a proposal carries the assignee and the reasoning. It needs a live check before the demo.
+  - Verified: `pytest` 159 passed, including that `list_members` prints team roles and "not set", and that a proposal carries an assignee plus reasoning and still writes no task. Frontend typecheck, lint and build pass.
+
+## D-048
+
+**Backlog and sprints: the backlog is the absence of a sprint, and planning is Admin-only**
+
+- **Context.** The backlog and sprint board is the PRD's other SHOULD-scope item. `tasks.sprint_id` has existed since the core schema with no table behind it, deliberately ([D-010](#d-010)). Both gates have passed, so the owner picked it up.
+- **Decision.**
+  - **The backlog is not a table.** A task whose `sprint_id` is null is in the backlog. Moving work in or out is one column write, and a task can never be in two places or in none.
+  - **`sprints`** holds `name` (1–80 chars), optional `start_date` and `end_date`, and `status` (`planned`, `active`, `completed`). A check constraint refuses an end date before the start date.
+  - **At most one active sprint per workspace**, enforced by a partial unique index rather than by the API, so "which sprint is active" always has one answer. Trying to start a second returns 409 with a readable message.
+  - **Deleting a sprint returns its tasks to the backlog** (`on delete set null`), because deleting a plan should never delete the work.
+  - **Planning is Admin-only.** `GET /sprints` needs membership; `POST`, `PATCH` and `DELETE /admin/sprints` need an Admin. Moving a task between the backlog and a sprint is an Admin action too: `sprint_id` is content, so the existing `tasks_member_update_guard` already refuses it for a Member, and no trigger change was needed. Members keep exactly what [D-021](#d-021) gave them, status and order.
+  - **The PRD's `POST /admin/sprints` and `GET /sprints` are built as written.** `PATCH /admin/sprints/{id}` and `DELETE /admin/sprints/{id}` are added beyond the PRD, because a sprint that can be created but never started, closed or removed is not usable.
+  - **The Tasks page gains a scope**, held in the URL as `?sprint=`: All work, Backlog, or a named sprint, each with a count of open tasks, and the active sprint marked. List and Board views both work inside the scope. Admins get Start sprint, Complete sprint, delete, and a sprint field on each task.
+  - **Sprint changes are audited** as `sprint.created`, `sprint.status_changed` and `sprint.deleted`.
+- **Why.** Modelling the backlog as a real container would mean two rows to keep in step and a task that could be in both or neither. The absence of a sprint cannot drift out of step with anything.
+- **Consequences.**
+  - Migration `20260918100000_sprints` creates the table, the foreign key from `tasks.sprint_id`, the one-active-sprint index and the row-level security policies. No existing task changes: every task starts in the backlog.
+  - The agent does not put tasks into sprints. It proposes tasks, which land in the backlog for an Admin to plan; nothing in the agent's tools mentions sprints.
+  - Completed sprints stay in the list but drop out of the scope tabs, so the bar does not grow without limit. There is no sprint archive view yet.
+  - Verified: `pytest` 169 passed (10 new: Members cannot move a task between backlog and sprint, `sprint_id` is not member-editable, reading the plan needs membership while every write needs an Admin, and four invalid-sprint shapes are refused). Frontend typecheck, lint and build pass. **The migration has not been applied to the database yet**, so this is not exercised against live data.
+
+## D-049
+
+**Fewer model calls per question: Haiku everywhere, native tool calls, and groundedness folded into the answer**
+
+- **Context.** A document question cost four model calls in series: the agent chose a tool, the answer model wrote the answer, a second call checked groundedness, and a third wrote one introductory sentence above an answer the page already shows in full. The owner asked for fewer calls and lower latency. Running the agent live also exposed two defects introduced by the move to Claude ([D-046](#d-046)).
+- **Decision.**
+  - **Claude Haiku 4.5 answers as well.** Claude Sonnet 4 is refused by Bedrock as a legacy model on this account, so the answer model is Haiku. The strong/fast split stays in the code and in configuration: setting `BEDROCK_ANSWER_MODEL` to a current Sonnet restores it without a code change.
+  - **The groundedness check moves into the answer call.** The answer model returns `answerable`, `sentences` with their `sources`, and its own `grounded` and `unsupported` verdict, in one structured response. The separate call is removed.
+  - **The schema is a Pydantic model** (`AnswerDraft`), and its JSON schema is generated from it with `$defs` inlined, rather than a hand-written dict.
+  - **Two checks in code can overrule the model's verdict**, because a self-check can be optimistic: a factual sentence citing nothing, and a sentence citing a passage id that was never shown. Both are facts about the output, not judgements, so they are decided deterministically. Output that cannot be parsed is flagged `groundedness_failed` rather than shown as checked, and `grounded` defaults to false when the model omits it.
+  - **The introductory sentence is written in code**, from the recorded answer: it says the documents do not cover the question when the answer is unanswerable, and warns when the answer is ungrounded or flagged. The turn therefore ends when a document tool answers, and the prompt tells the agent to do any task or member work first and call a document tool last.
+  - **The agent loop uses Claude's native tool calling.** The model is given the tools and returns a real tool call with validated arguments, instead of describing one inside a JSON envelope.
+- **Why the loop changed.** Two live failures, neither visible in the tests:
+  - The JSON envelope marked only `action` as required, and Claude omitted the rest. It returned `{"response": "..."}` with no `action`, which the loop read as a tool call with no tool. Every step was spent that way and the turn ended with "let me search the documents" having searched nothing.
+  - Requiring every field instead made it worse: forced to fill a `response` field, the model wrote an intention to call a tool and then answered with it. Native tool calling removes the choice, because a call and a reply are different kinds of output rather than two shapes of the same JSON.
+- **Consequences.**
+  - A document question costs **2 model calls** instead of 4. Measured after the change: 1 routing call, then one answer call at about 4 s, and a follow-up question resolved correctly against the conversation.
+  - **Groundedness is now a self-assessment inside the same generation, which is weaker than an independent pass.** A model that hallucinates a sentence is unlikely to flag it. The deterministic checks catch missing and invalid citations, not a fluent claim that a cited passage does not support. This is a real reduction in the strength of the guarantee behind non-negotiable 3, accepted for latency. `GROUNDEDNESS` results from before this change are not comparable with results after it.
+  - One turn now produces one checked answer, so the two-answers-per-turn cap is effectively one. Compound requests work only if the task tool is called before the document tool, which the prompt now requires.
+  - A provider without native tool calling (Gemini) keeps the JSON-decision path, which is still tested.
+  - Verified: `pytest` 174 passed, including the native tool path, plain text not being mistaken for a broken call, the last step offering no tools, the turn ending at a document tool, and a flagged answer being introduced with a warning. Live: the follow-up "what can the third one do?" resolved to "What can the Technician role do?" and called the tool, which it did not before.

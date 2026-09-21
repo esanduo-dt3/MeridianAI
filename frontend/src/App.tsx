@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppShell } from './layouts/AppShell'
+import { PageFrame } from './layouts/PageFrame'
 import { queryClient } from './lib/queryClient'
 import { MembersPage } from './routes/MembersPage'
 import { NotFound } from './routes/NotFound'
@@ -54,16 +55,86 @@ export default function App() {
                     <Route element={<AppShell />}>
                       <Route index element={<Navigate to="/tasks" replace />} />
                       <Route path="ask" element={<Navigate to="/assistant" replace />} />
-                      <Route path="assistant" element={<AssistantPage />} />
-                      <Route path="notes" element={<NotesPage />} />
-                      <Route path="notes/:noteId" element={<NotesPage />} />
-                      <Route path="documents" element={<DocumentsPage />} />
-                      <Route path="documents/:documentId" element={<DocumentViewer />} />
-                      <Route path="tasks" element={<TasksPage />} />
-                      <Route path="members" element={<MembersPage />} />
-                      <Route path="admin/review" element={<ReviewQueuePage />} />
-                      <Route path="admin/audit" element={<AuditLogPage />} />
-                      <Route path="admin/health" element={<PipelineHealthPage />} />
+                      <Route
+                        path="assistant"
+                        element={
+                          <PageFrame mode="reading">
+                            <AssistantPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="notes"
+                        element={
+                          <PageFrame mode="split">
+                            <NotesPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="notes/:noteId"
+                        element={
+                          <PageFrame mode="split">
+                            <NotesPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="documents"
+                        element={
+                          <PageFrame mode="operational">
+                            <DocumentsPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="documents/:documentId"
+                        element={
+                          <PageFrame mode="split">
+                            <DocumentViewer />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="tasks"
+                        element={
+                          <PageFrame mode="operational">
+                            <TasksPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="members"
+                        element={
+                          <PageFrame mode="operational">
+                            <MembersPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="admin/review"
+                        element={
+                          <PageFrame mode="operational">
+                            <ReviewQueuePage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="admin/audit"
+                        element={
+                          <PageFrame mode="operational">
+                            <AuditLogPage />
+                          </PageFrame>
+                        }
+                      />
+                      <Route
+                        path="admin/health"
+                        element={
+                          <PageFrame mode="operational">
+                            <PipelineHealthPage />
+                          </PageFrame>
+                        }
+                      />
                       <Route path="admin/members" element={<Navigate to="/members" replace />} />
                     </Route>
                   </Route>

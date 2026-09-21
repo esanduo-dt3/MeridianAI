@@ -30,8 +30,12 @@ Errors return `{"detail": "<message>"}`.
 | `DELETE /members/me` | Workspace | Any | Leaves the workspace. 409 if the caller is its last Admin |
 | `GET /members` | Workspace | Any | `members` with profiles; `invites` (pending) for Admins only |
 | `POST /admin/members` | Workspace | Admin | Body `{email, auth_role}`. Adds an existing account (`outcome: "added"`) or stores a pending invite (`"invited"`). 409 if already a member or already invited |
-| `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`. 409 if it would leave no Admin |
+| `PATCH /admin/members/{id}` | Workspace | Admin | Body `{auth_role}`, `{team_role}` or both. `team_role` is free text, 1–80 chars; empty clears it ([D-047](../decisions.md#d-047)). 409 if it would leave no Admin |
 | `DELETE /admin/members/{id}` | Workspace | Admin | Removes a member. 409 if it would leave no Admin |
+| `GET /sprints` | Workspace | Any | Sprints newest first, plus `active_sprint_id` ([D-048](../decisions.md#d-048)) |
+| `POST /admin/sprints` | Workspace | Admin | Body `{name, start_date?, end_date?, status?}`. 409 if a sprint is already active |
+| `PATCH /admin/sprints/{id}` | Workspace | Admin | Rename, re-date, or set `status` (`planned`, `active`, `completed`). 409 if it would make a second sprint active |
+| `DELETE /admin/sprints/{id}` | Workspace | Admin | Deletes the sprint; its tasks return to the backlog |
 | `DELETE /admin/invites/{id}` | Workspace | Admin | Revokes a pending invite |
 | `GET /tasks` | Workspace | Any | `tasks` (with assignee and creator profiles) and `proposals` (pending agent actions) |
 | `POST /tasks` | Workspace | Admin | Body `{title, description?, status?, priority?, due_date?, assignee_id?, parent_task_id?}`. Assignee must be a member |
@@ -73,7 +77,7 @@ Errors return `{"detail": "<message>"}`.
   "flag_reasons": [],
   "retrieval": { "run_id": "uuid", "attempts": 1, "grade": "good", "final_query": "...",
                  "top_score": 0.83, "reranked": true, "latency_ms": 2840 },
-  "model": "gemini-3.5-flash"
+  "model": "claude-sonnet-4"
 }
 ```
 

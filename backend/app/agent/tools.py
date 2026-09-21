@@ -42,7 +42,9 @@ from app.core.supabase import Db
 from app.core.workspace import WorkspaceContext
 
 MAX_PROPOSALS_PER_TURN = 5
-# Each document answer spends an answer-model call and a groundedness check (D-032).
+# The loop ends the turn after a document tool answers (D-049), so one turn
+# normally produces one answer. This still bounds the case where a document tool
+# fails and the model tries another one.
 MAX_DOCUMENT_ANSWERS_PER_TURN = 2
 MIN_QUOTE_WORDS = 3
 PRIORITY_RANK = {"urgent": 0, "high": 1, "medium": 2, "low": 3, "none": 4}
@@ -158,7 +160,11 @@ class ProposeTaskInput(BaseModel):
     due_date: str | None = Field(default=None, description="YYYY-MM-DD, resolved from relative dates using today.")
     assignee_email: str | None = Field(default=None, description="A member's email from list_members.")
     parent_task_id: str | None = Field(default=None, description="Set to make this a subtask of an existing task.")
-    reasoning: str = Field(min_length=1, max_length=1000, description="Why this task, shown to the approving Admin.")
+    reasoning: str = Field(
+        min_length=1, max_length=1000,
+        description="Why this task, shown to the approving Admin. When you chose the assignee yourself, say which team "
+                    "role you matched and why.",
+    )
     user_request_quote: str = Field(
         description="The exact words from the user's CURRENT message that ask for this task. Copy them verbatim."
     )
@@ -209,13 +215,20 @@ def build_tools(ctx: ToolContext) -> list[BaseTool]:
         return "\n".join(lines)
 
     async def list_members() -> str:
-        rows = await ctx.db.select("workspace_members", {"select": "user_id,auth_role,users(email,full_name)",
+        rows = await ctx.db.select("workspace_members", {"select": "user_id,auth_role,team_role,users(email,full_name)",
                                                          "workspace_id": f"eq.{ws.workspace_id}"})
-        return "\n".join(
-            f"- {r['users'].get('full_name') or '(no name)'} <{r['users']['email']}> {r['auth_role']}"
-            + (" (this is the person asking)" if r["user_id"] == ws.user_id else "")
-            for r in rows
-        ) or "No members found."
+        # The team role is what a person does ("Backend engineer"); the agent
+        # matches it against the task to suggest an assignee (D-047). It never
+        # grants permissions: auth_role does that.
+        lines = []
+        for r in rows:
+            team_role = (r.get("team_role") or "").strip()
+            lines.append(
+                f"- {r['users'].get('full_name') or '(no name)'} <{r['users']['email']}> {r['auth_role']}"
+                + (f" | team role: {team_role}" if team_role else " | team role: not set")
+                + (" (this is the person asking)" if r["user_id"] == ws.user_id else "")
+            )
+        return "\n".join(lines) or "No members found."
 
     async def answer_from_documents(question: str, profile: str) -> str:
         # Imported here: retrieval pulls in the reranker client, which tools that
@@ -327,7 +340,8 @@ def build_tools(ctx: ToolContext) -> list[BaseTool]:
             description="Full detail of one task, including its description and subtasks."),
         StructuredTool.from_function(
             coroutine=list_members, name="list_members",
-            description="Workspace members with names, emails and roles. Use before assigning a task to someone."),
+            description=("Workspace members with names, emails, Meridian roles and team roles (what each person does, "
+                         "such as 'Backend engineer'). Use before assigning a task, including to pick an assignee.")),
         StructuredTool.from_function(
             coroutine=lookup_fact, name="lookup_fact", args_schema=DocumentQuestionInput,
             description=("Answer a question with one specific answer from the workspace documents: a figure, a name, "

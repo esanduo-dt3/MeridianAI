@@ -39,6 +39,8 @@ class Task(BaseModel):
     priority: Priority
     position: float
     parent_task_id: str | None
+    # Null means the task is in the backlog (D-048).
+    sprint_id: str | None
     due_date: date | None
     source: Literal["manual", "agent"]
     created_at: str
@@ -69,6 +71,8 @@ class TaskCreate(BaseModel):
     due_date: date | None = None
     assignee_id: str | None = None
     parent_task_id: str | None = None
+    # Omit or send null to create the task in the backlog (D-048).
+    sprint_id: str | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -80,10 +84,12 @@ class TaskUpdate(BaseModel):
     due_date: date | None = None
     assignee_id: str | None = None
     parent_task_id: str | None = None
+    # Set to move the task into a sprint, null to send it back to the backlog.
+    sprint_id: str | None = None
 
 
 _TASK_SELECT = (
-    "id,title,description,status,priority,position,parent_task_id,due_date,source,created_at,updated_at,completed_at,"
+    "id,title,description,status,priority,position,parent_task_id,sprint_id,due_date,source,created_at,updated_at,completed_at,"
     "assignee:users!tasks_assignee_id_fkey(id,email,full_name,avatar_url),"
     "created_by:users!tasks_created_by_fkey(id,email,full_name,avatar_url)"
 )
@@ -102,6 +108,13 @@ async def _ensure_member(db: Db, workspace_id: str, user_id: str | None) -> None
     )
     if not rows:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "The assignee must be a member of this workspace")
+
+
+async def _ensure_sprint(db: Db, workspace_id: str, sprint_id: str) -> None:
+    """A task can only join a sprint of its own workspace."""
+    rows = await db.select("sprints", {"select": "id", "workspace_id": f"eq.{workspace_id}", "id": f"eq.{sprint_id}"})
+    if not rows:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That sprint is not in this workspace")
 
 
 @router.get("/tasks", response_model=TaskBoard)
@@ -125,6 +138,8 @@ async def list_tasks(context: WorkspaceContext = Depends(get_workspace_context),
 @router.post("/tasks", response_model=Task, status_code=status.HTTP_201_CREATED)
 async def create_task(body: TaskCreate, context: WorkspaceContext = Depends(require_admin), db: Db = Depends(user_db)):
     await _ensure_member(db, context.workspace_id, body.assignee_id)
+    if body.sprint_id:
+        await _ensure_sprint(db, context.workspace_id, body.sprint_id)
     row = await db.insert(
         "tasks",
         {
@@ -157,6 +172,8 @@ async def update_task(
         raise HTTPException(status.HTTP_409_CONFLICT, "A task cannot be its own parent")
     if "assignee_id" in changes:
         await _ensure_member(db, context.workspace_id, changes["assignee_id"])
+    if changes.get("sprint_id"):
+        await _ensure_sprint(db, context.workspace_id, changes["sprint_id"])
 
     rows = await db.update(
         "tasks", {"id": f"eq.{task_id}", "workspace_id": f"eq.{context.workspace_id}"}, changes, select=_TASK_SELECT

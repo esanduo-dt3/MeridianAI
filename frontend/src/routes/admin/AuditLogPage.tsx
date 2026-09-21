@@ -5,7 +5,8 @@ import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, Skeleton } from '../../components/Feedback'
 import { SelectField, TextField } from '../../components/Field'
-import { PageHeader } from '../../components/PageHeader'
+import { OperationalHeader } from '../../components/OperationalHeader'
+import { WorkspaceToolbar } from '../../components/WorkspaceToolbar'
 import { errorText } from '../../lib/queryClient'
 import type { AuditEntry } from '../../lib/types'
 import { AdminOnly } from '../../workspace/AdminOnly'
@@ -15,10 +16,12 @@ const stamp = new Intl.DateTimeFormat(undefined, {
 })
 
 /** Every prediction, proposal and decision, timestamped and attributable (PRD 13). */
+// PUBLIC_INTERFACE
 export function AuditLogPage() {
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Administrator evidence"
         title="Audit log"
         description="Every answer, agent turn, proposed action and review decision, with the time and who or what made it."
       />
@@ -43,33 +46,35 @@ function Log() {
 
   return (
     <div className="flex flex-col gap-4">
-      <form onSubmit={apply} className="flex flex-wrap items-end gap-3">
-        <SelectField
-          label="Made by"
-          value={draft.actorType}
-          onChange={(e) => {
-            const next = { ...draft, actorType: e.target.value as AuditFilters['actorType'] }
-            setDraft(next)
-            setFilters(next)
-          }}
-          wrapperClassName="w-44"
-        >
-          <option value="">Anyone</option>
-          <option value="user">People</option>
-          <option value="agent">The agent</option>
-          <option value="system">The system</option>
-        </SelectField>
-        <TextField
-          label="Action contains"
-          placeholder="e.g. agent_action, answer.reviewed"
-          value={draft.action}
-          onChange={(e) => setDraft({ ...draft, action: e.target.value })}
-          wrapperClassName="min-w-[14rem] flex-1"
-        />
-        <Button type="submit" variant="secondary" leading={<MagnifyingGlass aria-hidden size={16} weight="bold" />}>
-          Filter
-        </Button>
-      </form>
+      <WorkspaceToolbar label="Audit filters">
+        <form onSubmit={apply} className="flex w-full flex-wrap items-end gap-3">
+          <SelectField
+            label="Made by"
+            value={draft.actorType}
+            onChange={(e) => {
+              const next = { ...draft, actorType: e.target.value as AuditFilters['actorType'] }
+              setDraft(next)
+              setFilters(next)
+            }}
+            wrapperClassName="w-44"
+          >
+            <option value="">Anyone</option>
+            <option value="user">People</option>
+            <option value="agent">The agent</option>
+            <option value="system">The system</option>
+          </SelectField>
+          <TextField
+            label="Action contains"
+            placeholder="e.g. agent_action, answer.reviewed"
+            value={draft.action}
+            onChange={(e) => setDraft({ ...draft, action: e.target.value })}
+            wrapperClassName="min-w-[14rem] flex-1"
+          />
+          <Button type="submit" variant="secondary" leading={<MagnifyingGlass aria-hidden size={16} weight="bold" />}>
+            Filter
+          </Button>
+        </form>
+      </WorkspaceToolbar>
 
       {log.isPending ? (
         <div className="flex flex-col gap-2" role="status" aria-label="Loading the audit log">

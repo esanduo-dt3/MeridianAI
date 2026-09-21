@@ -9,6 +9,7 @@ import {
   NotePencil,
   Pulse,
   Robot,
+  SidebarSimple,
   SignOut,
   Tray,
   UsersThree,
@@ -22,6 +23,7 @@ import { Wordmark } from '../components/Wordmark'
 import { ThemeToggle } from '../theme/ThemeToggle'
 import { WorkspaceSwitcher } from '../workspace/WorkspaceSwitcher'
 import { useWorkspace } from '../workspace/WorkspaceProvider'
+import { readRailCollapsed, writeRailCollapsed } from './railPreference'
 
 interface NavItem {
   to: string
@@ -44,10 +46,26 @@ const adminNav: NavItem[] = [
   { to: '/admin/health', label: 'Pipeline health', icon: Pulse },
 ]
 
+// PUBLIC_INTERFACE
 export function AppShell() {
+  /**
+   * Authenticated application shell: the skip link, the collapsible desktop
+   * navigation rail, the mobile top bar and drawer, and the focusable `main`
+   * region that hosts the routed outlet.
+   *
+   * The desktop rail has two widths driven entirely by the `--rail-expanded`
+   * and `--rail-collapsed` tokens. The width lives in an inline
+   * `gridTemplateColumns` rather than a utility class (DEC-02) because a
+   * Tailwind class cannot interpolate a runtime value, and duplicating the
+   * widths in two class strings would let the grid column and the `aside`
+   * disagree. The collapse preference is seeded synchronously so the first
+   * paint already reflects the stored choice, and it has no effect below the
+   * `lg` breakpoint where the layout is a single column.
+   */
   const location = useLocation()
   const reduce = useReducedMotion()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [railCollapsed, setRailCollapsed] = useState(readRailCollapsed)
   const mainRef = useRef<HTMLElement>(null)
 
   // Move focus to the new page on navigation so screen readers announce it.
@@ -62,8 +80,21 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [drawerOpen])
 
+  // Persist on the same tick as the state change so a reload always agrees with the rendered rail.
+  const toggleRail = () => {
+    setRailCollapsed((current) => {
+      writeRailCollapsed(!current)
+      return !current
+    })
+  }
+
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
+    <div
+      className="min-h-dvh transition-[grid-template-columns] duration-[var(--duration-panel)] ease-[var(--ease-out-quint)] lg:grid"
+      style={{
+        gridTemplateColumns: `${railCollapsed ? 'var(--rail-collapsed)' : 'var(--rail-expanded)'} minmax(0,1fr)`,
+      }}
+    >
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-ink px-3 py-2 text-on-ink focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
@@ -71,9 +102,9 @@ export function AppShell() {
         Skip to content
       </a>
 
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh border-r border-rule bg-paper lg:block">
-        <Sidebar layoutGroup="desktop" />
+      {/* Desktop sidebar: glass material from the shared tokens, never local opacity or blur values. */}
+      <aside className="sticky top-0 hidden h-dvh overflow-hidden border-r border-[var(--glass-edge)] bg-[var(--glass-surface)] backdrop-blur-[var(--glass-blur)] lg:block">
+        <Sidebar layoutGroup="desktop" collapsed={railCollapsed} onToggleCollapse={toggleRail} />
       </aside>
 
       {/* Mobile top bar */}
@@ -118,6 +149,7 @@ export function AppShell() {
               >
                 <X size={20} weight="bold" />
               </button>
+              {/* The drawer never collapses: the rail preference is a desktop-only concern. */}
               <Sidebar layoutGroup="mobile" onNavigate={() => setDrawerOpen(false)} />
             </motion.aside>
           </div>
@@ -127,10 +159,10 @@ export function AppShell() {
       <main id="main" ref={mainRef} tabIndex={-1} className="min-w-0 outline-none">
         <motion.div
           key={location.pathname}
-          initial={reduce ? false : { opacity: 0, y: 8 }}
+          initial={reduce ? false : { opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto w-full max-w-[1080px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12"
+          transition={{ duration: reduce ? 0 : 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full"
         >
           <Outlet />
         </motion.div>
@@ -142,42 +174,88 @@ export function AppShell() {
 interface SidebarProps {
   layoutGroup: string
   onNavigate?: () => void
+  /** Collapsed presentation; only the desktop rail ever sets this. */
+  collapsed?: boolean
+  /** Supplied only by the desktop rail, which is what gates the collapse control. */
+  onToggleCollapse?: () => void
 }
 
-function Sidebar({ layoutGroup, onNavigate }: SidebarProps) {
+function Sidebar({ layoutGroup, onNavigate, collapsed = false, onToggleCollapse }: SidebarProps) {
   const { isAdmin } = useWorkspace()
   return (
-    <div className="flex h-full flex-col px-3 pt-4 pb-4">
-      <div className="pb-5">
-        <WorkspaceSwitcher onNavigate={onNavigate} />
+    <div className={`flex h-full flex-col pt-4 pb-4 ${collapsed ? 'px-2' : 'px-3'}`}>
+      <div className={collapsed ? 'flex flex-col items-center gap-2 pb-4' : 'flex items-center gap-2 pb-5'}>
+        <div className={collapsed ? 'contents' : 'min-w-0 flex-1'}>
+          <WorkspaceSwitcher onNavigate={onNavigate} collapsed={collapsed} />
+        </div>
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-(--radius-control) text-ink-3 transition-colors duration-150 hover:bg-[var(--glass-raised)] hover:text-ink"
+          >
+            <SidebarSimple aria-hidden size={18} weight="bold" className={collapsed ? 'rotate-180' : undefined} />
+          </button>
+        )}
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-6 overflow-y-auto">
-        <NavGroup label="Workspace" items={workspaceNav} layoutGroup={layoutGroup} onNavigate={onNavigate} />
-        {isAdmin && <NavGroup label="Admin" items={adminNav} layoutGroup={layoutGroup} onNavigate={onNavigate} />}
+        <NavGroup
+          label="Workspace"
+          items={workspaceNav}
+          layoutGroup={layoutGroup}
+          onNavigate={onNavigate}
+          collapsed={collapsed}
+        />
+        {isAdmin && (
+          <NavGroup
+            label="Admin"
+            items={adminNav}
+            layoutGroup={layoutGroup}
+            onNavigate={onNavigate}
+            collapsed={collapsed}
+          />
+        )}
       </nav>
 
-      <div className="flex flex-col gap-4 border-t border-rule px-3 pt-4">
-        <ReliabilityNote compact />
-        <ThemeToggle className="self-start" />
-        <UserMenu />
+      <div
+        className={`flex flex-col border-t border-[var(--glass-edge)] pt-4 ${
+          collapsed ? 'items-center gap-3' : 'gap-4 px-3'
+        }`}
+      >
+        {/* A 72px column cannot render a sentence; the same text stays on the Assistant route. */}
+        {!collapsed && <ReliabilityNote compact />}
+        <ThemeToggle className={collapsed ? 'flex-col' : 'self-start'} />
+        <UserMenu collapsed={collapsed} />
       </div>
     </div>
   )
 }
 
-function NavGroup({ label, items, layoutGroup, onNavigate }: SidebarProps & { label: string; items: NavItem[] }) {
+function NavGroup({ label, items, layoutGroup, onNavigate, collapsed = false }: SidebarProps & { label: string; items: NavItem[] }) {
   return (
     <div>
-      <p className="px-3 pb-1.5 text-xs font-medium text-ink-3">{label}</p>
+      {collapsed ? (
+        // Truncated "Workspace"/"Admin" words read as noise at 72px, so the group
+        // boundary becomes a decorative hairline instead.
+        <div aria-hidden className="mx-auto mb-1.5 h-px w-8 rounded-full bg-[var(--glass-edge)]" />
+      ) : (
+        <p className="px-3 pb-1.5 text-xs font-medium text-ink-3">{label}</p>
+      )}
       <ul className="flex flex-col gap-0.5">
         {items.map((item) => (
           <li key={item.to}>
             <NavLink
               to={item.to}
               onClick={onNavigate}
+              title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `group relative flex min-h-10 items-center gap-3 rounded-(--radius-control) px-3 text-[14.5px] transition-colors duration-150 ${
+                `group relative flex min-h-10 items-center rounded-(--radius-control) text-[14.5px] transition-colors duration-150 ${
+                  collapsed ? 'justify-center px-0' : 'gap-3 px-3'
+                } ${
                   isActive ? 'bg-surface font-medium text-ink shadow-(--shadow-hairline)' : 'text-ink-2 hover:bg-sunken hover:text-ink'
                 }`
               }
@@ -197,7 +275,9 @@ function NavGroup({ label, items, layoutGroup, onNavigate }: SidebarProps & { la
                     weight={isActive ? 'fill' : 'regular'}
                     className={isActive ? 'text-cobalt' : 'text-ink-3 group-hover:text-ink-2'}
                   />
-                  {item.label}
+                  {/* Collapsed keeps the label in the accessibility tree rather than swapping to
+                      aria-label, so every destination resolves by the same accessible name. */}
+                  {collapsed ? <span className="sr-only">{item.label}</span> : item.label}
                 </>
               )}
             </NavLink>
@@ -208,7 +288,7 @@ function NavGroup({ label, items, layoutGroup, onNavigate }: SidebarProps & { la
   )
 }
 
-function UserMenu() {
+function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
   const { user, signOut } = useAuth()
   const { profile } = useWorkspace()
   const [error, setError] = useState<string | null>(null)
@@ -225,28 +305,41 @@ function UserMenu() {
     }
   }
 
+  const signOutButton = (
+    <button
+      type="button"
+      onClick={handleSignOut}
+      aria-label="Sign out"
+      title="Sign out"
+      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-ink-3 transition-colors hover:bg-sunken hover:text-ink"
+    >
+      <SignOut size={18} weight="bold" />
+    </button>
+  )
+
   return (
-    <div>
-      <div className="flex items-center gap-3">
-        <Avatar name={name} email={email} src={avatar} size={32} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-ink" title={name}>
-            {name}
-          </p>
-          <p className="truncate text-xs text-ink-3" title={email}>
-            {email}
-          </p>
+    <div className={collapsed ? 'flex flex-col items-center' : undefined}>
+      {collapsed ? (
+        <div className="flex flex-col items-center gap-2">
+          <span title={name}>
+            <Avatar name={name} email={email} src={avatar} size={32} />
+          </span>
+          {signOutButton}
         </div>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          aria-label="Sign out"
-          title="Sign out"
-          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-ink-3 transition-colors hover:bg-sunken hover:text-ink"
-        >
-          <SignOut size={18} weight="bold" />
-        </button>
-      </div>
+      ) : (
+        <div className="flex items-center gap-3">
+          <Avatar name={name} email={email} src={avatar} size={32} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-ink" title={name}>
+              {name}
+            </p>
+            <p className="truncate text-xs text-ink-3" title={email}>
+              {email}
+            </p>
+          </div>
+          {signOutButton}
+        </div>
+      )}
       {error && (
         <p role="alert" className="mt-2 text-xs text-danger">
           {error}

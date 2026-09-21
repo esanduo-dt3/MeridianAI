@@ -6,7 +6,7 @@ import { useReviewMutations, useReviewQueue } from '../../admin/useAdmin'
 import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, Skeleton } from '../../components/Feedback'
-import { PageHeader } from '../../components/PageHeader'
+import { OperationalHeader } from '../../components/OperationalHeader'
 import { errorText } from '../../lib/queryClient'
 import type { RecentDecision, ReviewAction, ReviewAnswer } from '../../lib/types'
 import { PriorityIcon } from '../../tasks/TaskBits'
@@ -19,12 +19,19 @@ const stamp = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short
  * Flagged answers and pending agent actions, each needing a person's decision
  * (D-040). Every decision is written with its audit entry in one transaction.
  */
+// PUBLIC_INTERFACE
 export function ReviewQueuePage() {
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Administrator review"
         title="Review queue"
         description="Low-confidence, uncited or ungrounded answers and agent-proposed actions. Each decision is recorded in the audit log."
+        status={
+          <span className="rounded-full bg-flag-wash px-2.5 py-1 text-xs font-medium text-flag">
+            Human decision required
+          </span>
+        }
       />
       <AdminOnly>
         <Queue />
@@ -84,8 +91,8 @@ function Queue() {
 function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   if (count === 0) return null
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">
+    <section className="flex flex-col gap-3 rounded-(--radius-panel) border border-rule bg-paper p-3 sm:p-4">
+      <h2 className="text-sm font-semibold text-ink">
         {title} <span className="font-sans text-base font-normal text-ink-3">· {count}</span>
       </h2>
       {children}

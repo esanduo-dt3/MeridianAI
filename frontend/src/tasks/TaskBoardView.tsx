@@ -163,8 +163,8 @@ export function TaskBoardView({ tasks, allTasks, onOpen }: TaskBoardViewProps) {
         },
       }}
     >
-      <div className="-mx-5 overflow-x-auto px-5 pb-4 sm:-mx-8 sm:px-8 lg:mx-0 lg:px-0">
-        <div className="grid min-w-[760px] grid-cols-3 gap-4">
+      <div className="bounded-overflow rounded-(--radius-panel) border border-rule bg-surface p-3 pb-4">
+        <div className="grid min-w-[760px] grid-cols-3 gap-3">
           {STATUSES.map(({ value, label }) => (
             <BoardColumn key={value} status={value} label={label} ids={columns[value]} count={columns[value].length}>
               {columns[value].map((id) => {
@@ -211,7 +211,7 @@ function BoardColumn({ status, label, ids, count, children }: { status: TaskStat
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <div
           ref={setNodeRef}
-          className={`flex min-h-40 flex-1 flex-col gap-2 rounded-(--radius-panel) border p-2 transition-colors duration-150 ${
+          className={`flex min-h-40 flex-1 flex-col gap-2 rounded-(--radius-control) border p-2 transition-colors duration-150 ${
             isOver ? 'border-cobalt/50 bg-cobalt-wash/40' : 'border-rule bg-sunken/50'
           }`}
         >

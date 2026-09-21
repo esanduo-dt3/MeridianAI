@@ -25,7 +25,11 @@ export function TaskListView({ nodes, onOpen, forceExpanded }: TaskListViewProps
     })
 
   return (
-    <ul role="tree" aria-label="Tasks" className="flex flex-col">
+    <ul
+      role="tree"
+      aria-label="Tasks"
+      className="flex flex-col overflow-hidden rounded-(--radius-panel) border border-rule bg-surface p-1 shadow-(--shadow-hairline)"
+    >
       {nodes.map((node) => (
         <TaskRow key={node.task.id} node={node} depth={0} onOpen={onOpen} collapsed={forceExpanded ? new Set() : collapsed} onToggle={toggle} />
       ))}
@@ -52,7 +56,7 @@ function TaskRow({ node, depth, onOpen, collapsed, onToggle }: TaskRowProps) {
   return (
     <li role="treeitem" aria-expanded={hasChildren ? expanded : undefined} aria-selected={false}>
       <div
-        className="group flex min-h-11 items-center gap-1 rounded-(--radius-control) pr-2 transition-colors hover:bg-sunken"
+        className="group flex min-h-[var(--density-row)] items-center gap-1 rounded-(--radius-control) pr-2 transition-colors hover:bg-sunken"
         style={{ paddingLeft: depth * 22 }}
       >
         <span className="grid size-6 shrink-0 place-items-center">

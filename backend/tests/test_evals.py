@@ -302,7 +302,7 @@ async def test_agent_mode_scores_routing_citations_traps_and_must_not_terms(monk
 
     chunk = _chunk("The CNN model reached 94% accuracy.")
     answer_gateway = ScriptedGateway([
-        {"answerable": True, "sentences": [{"text": "It reached 94% accuracy, not AES.", "sources": [1]}]},
+        {"answerable": True, "sentences": [{"text": "It reached 94% accuracy, not AES.", "sources": [1]}], "grounded": True, "unsupported": []},
         {"grounded": True, "unsupported": []},
     ])
     _script_documents(monkeypatch, chunk, answer_gateway)

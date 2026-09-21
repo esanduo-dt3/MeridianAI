@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/Dialog'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState, RoleBadge, Skeleton } from '../components/Feedback'
 import { SelectField, TextField } from '../components/Field'
-import { PageHeader } from '../components/PageHeader'
+import { OperationalHeader } from '../components/OperationalHeader'
 import { apiFetch } from '../lib/api'
 import { errorText } from '../lib/queryClient'
 import type { AddMemberResult, AuthRole, Invite, Member, Roster } from '../lib/types'
@@ -17,19 +17,29 @@ import { useWorkspace, wsKey } from '../workspace/WorkspaceProvider'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
+/** Renders the workspace roster, invitations, roles, and membership actions. */
+// PUBLIC_INTERFACE
 export function MembersPage() {
   const { active, isAdmin } = useWorkspace()
   const rosterKey = wsKey(active?.id, 'members')
   const roster = useQuery({ queryKey: rosterKey, queryFn: () => apiFetch<Roster>('/members') })
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Workspace access"
         title="Members"
         description={
           isAdmin
             ? `Add people to ${active?.name} and choose whether each one is an Admin or a Member.`
             : `People in ${active?.name}. Admins manage who's here and what they can do.`
+        }
+        status={
+          roster.isSuccess ? (
+            <span className="rounded-full bg-sunken px-2.5 py-1 text-xs font-medium text-ink-2 tabular">
+              {roster.data.members.length} {roster.data.members.length === 1 ? 'member' : 'members'}
+            </span>
+          ) : undefined
         }
       />
 
@@ -164,6 +174,28 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
     onError: (err) => toast.error(errorText(err, "The role couldn't be changed.")),
   })
 
+  // The team role is what this person does, not what they may do in Meridian.
+  // The agent reads it to suggest an assignee; it never grants permissions.
+  const [teamRole, setTeamRole] = useState(member.team_role ?? '')
+  const saveTeamRole = useMutation({
+    mutationFn: (team_role: string) =>
+      apiFetch<Member>(`/admin/members/${member.id}`, { method: 'PATCH', body: { team_role } }),
+    onSuccess: (updated) => {
+      setTeamRole(updated.team_role ?? '')
+      void invalidate()
+      toast.success(updated.team_role ? `${name} is the ${updated.team_role}` : `Cleared the team role for ${name}`)
+    },
+    onError: (err) => {
+      setTeamRole(member.team_role ?? '')
+      toast.error(errorText(err, "The team role couldn't be saved."))
+    },
+  })
+
+  const commitTeamRole = () => {
+    const next = teamRole.trim()
+    if (next !== (member.team_role ?? '')) saveTeamRole.mutate(next)
+  }
+
   const remove = useMutation({
     mutationFn: () => apiFetch<void>(`/admin/members/${member.id}`, { method: 'DELETE' }),
     onSuccess: () => {
@@ -174,7 +206,7 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
   })
 
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-3 px-4 py-3 sm:px-5">
       <Avatar name={member.profile.full_name} email={member.profile.email} src={member.profile.avatar_url} size={36} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-ink">
@@ -183,11 +215,27 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
         </p>
         <p className="truncate text-sm text-ink-3">
           {member.profile.full_name ? `${member.profile.email} · ` : ''}Joined {dateFormat.format(new Date(member.joined_at))}
+          {!canManage && member.team_role ? ` · ${member.team_role}` : ''}
         </p>
       </div>
 
       {canManage ? (
         <div className="flex items-center gap-1">
+          <TextField
+            label={`Team role for ${name}`}
+            hideLabel
+            placeholder="Team role"
+            value={teamRole}
+            maxLength={80}
+            disabled={saveTeamRole.isPending}
+            onChange={(event) => setTeamRole(event.target.value)}
+            onBlur={commitTeamRole}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur()
+              if (event.key === 'Escape') setTeamRole(member.team_role ?? '')
+            }}
+            className="min-h-10 w-40 text-sm"
+          />
           <SelectField
             label={`Role for ${name}`}
             hideLabel
