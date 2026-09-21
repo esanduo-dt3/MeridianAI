@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { useReducedMotion } from 'motion/react'
 import { ArrowLeft, CheckCircle, Circle, CircleNotch, Code, Rows, Table, WarningCircle } from '@phosphor-icons/react'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState, Skeleton } from '../components/Feedback'
+import { OperationalHeader } from '../components/OperationalHeader'
 import { ProgressBar } from '../documents/IngestProgress'
 import { embeddingFraction } from '../documents/ingestState'
 import { useDocument } from '../documents/useDocuments'
@@ -21,11 +23,13 @@ const KIND_ICON = { text: Rows, table: Table, code: Code } as const
  * Passages are shown as soon as they are saved, while embedding is still running,
  * with each passage marked until its embedding is stored (D-034).
  */
+// PUBLIC_INTERFACE
 export function DocumentViewer() {
   const { documentId } = useParams()
   const [params, setParams] = useSearchParams()
   const doc = useDocument(documentId)
   const markRef = useRef<HTMLElement>(null)
+  const reduceMotion = useReducedMotion()
 
   const selected: ChunkInfo | undefined = doc.data?.chunks.find((c) => c.id === params.get('chunk'))
   const start = selected?.char_start ?? (params.has('start') ? Number(params.get('start')) : null)
@@ -34,8 +38,8 @@ export function DocumentViewer() {
   const hasSpan = start !== null && end !== null && Number.isFinite(start) && Number.isFinite(end) && end > start && end <= text.length
 
   useEffect(() => {
-    markRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [start, end, doc.data?.id])
+    markRef.current?.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [start, end, doc.data?.id, reduceMotion])
 
   if (doc.isPending) {
     return (
@@ -51,16 +55,12 @@ export function DocumentViewer() {
   const data = doc.data
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <Link to="/documents" className="inline-flex items-center gap-1.5 text-sm text-ink-3 hover:text-ink">
-          <ArrowLeft aria-hidden size={14} weight="bold" />
-          Documents
-        </Link>
-        <h1 className="mt-2 font-display text-[26px] leading-tight font-semibold tracking-[-0.03em] break-words text-ink sm:text-[30px]">
-          {data.file_name}
-        </h1>
-        <p className="mt-1 text-sm text-ink-3">
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Document passages"
+        title={data.file_name}
+        description={
+          <>
           {[
             data.doc_type?.toUpperCase(),
             formatBytes(data.size_bytes),
@@ -70,8 +70,18 @@ export function DocumentViewer() {
           ]
             .filter(Boolean)
             .join(' · ')}
-        </p>
-      </div>
+          </>
+        }
+        actions={
+          <Link
+            to="/documents"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-(--radius-control) border border-rule bg-surface px-3 text-sm text-ink-2 hover:border-rule-strong hover:text-ink"
+          >
+            <ArrowLeft aria-hidden size={14} weight="bold" />
+            Documents
+          </Link>
+        }
+      />
 
       {data.parsed_status === 'processing' && data.processing_stage === 'embedding' && (
         <div role="status" className="rounded-(--radius-panel) border border-rule bg-surface px-5 py-4">
@@ -105,8 +115,11 @@ export function DocumentViewer() {
           {data.parse_error ?? 'Passages appear here as soon as the file is split into passages. This page updates automatically.'}
         </EmptyState>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <nav aria-label="Passages" className="lg:sticky lg:top-6 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[19rem_minmax(0,1fr)]">
+          <nav
+            aria-label="Passages"
+            className="rounded-(--radius-panel) border border-rule bg-surface p-2 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto"
+          >
             <ol className="flex flex-col gap-1">
               {data.chunks.map((chunk) => {
                 const Icon = KIND_ICON[chunk.kind]

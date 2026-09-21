@@ -5,7 +5,8 @@ import { flagReasonText } from '../../agent/answerModel'
 import { EmptyState } from '../../components/EmptyState'
 import { ErrorState, Skeleton } from '../../components/Feedback'
 import { SelectField } from '../../components/Field'
-import { PageHeader } from '../../components/PageHeader'
+import { OperationalHeader } from '../../components/OperationalHeader'
+import { WorkspaceToolbar } from '../../components/WorkspaceToolbar'
 import { errorText } from '../../lib/queryClient'
 import type { HealthRate, PipelineHealth } from '../../lib/types'
 import { AdminOnly } from '../../workspace/AdminOnly'
@@ -14,12 +15,19 @@ import { AdminOnly } from '../../workspace/AdminOnly'
  * Figures calculated from recorded retrieval runs and answers, none estimated
  * (PRD 8.2, D-040). Every rate shows the counts behind it.
  */
+// PUBLIC_INTERFACE
 export function PipelineHealthPage() {
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Administrator evidence"
         title="Pipeline health"
         description="Retrieval, groundedness and latency, calculated from every recorded question. Nothing on this page is estimated."
+        status={
+          <span className="rounded-full bg-grounded-wash px-2.5 py-1 text-xs font-medium text-grounded">
+            Recorded data only
+          </span>
+        }
       />
       <AdminOnly>
         <Health />
@@ -34,11 +42,13 @@ function Health() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SelectField label="Period" value={String(days)} onChange={(e) => setDays(Number(e.target.value))} wrapperClassName="w-48">
-        <option value="7">Last 7 days</option>
-        <option value="30">Last 30 days</option>
-        <option value="90">Last 90 days</option>
-      </SelectField>
+      <WorkspaceToolbar label="Pipeline health period">
+        <SelectField label="Period" value={String(days)} onChange={(e) => setDays(Number(e.target.value))} wrapperClassName="w-48">
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </SelectField>
+      </WorkspaceToolbar>
 
       {health.isPending ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" role="status" aria-label="Loading pipeline health">
@@ -104,7 +114,7 @@ function Dashboard({ h }: { h: PipelineHealth }) {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">By day</h2>
-        <div className="overflow-x-auto rounded-(--radius-panel) border border-rule bg-surface">
+        <div className="bounded-overflow rounded-(--radius-panel) border border-rule bg-surface">
           <table className="w-full min-w-[40rem] text-sm">
             <caption className="sr-only">Pipeline figures per day</caption>
             <thead className="border-b border-rule text-left text-xs text-ink-3">

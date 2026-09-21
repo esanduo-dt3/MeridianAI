@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import * as RadixDialog from '@radix-ui/react-dialog'
-import { Robot, Trash, X } from '@phosphor-icons/react'
+import { Robot, Trash } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '../components/Button'
 import { ConfirmDialog } from '../components/Dialog'
 import { SelectField, TextField } from '../components/Field'
+import { Inspector, InspectorClose } from '../components/Inspector'
 import { errorText } from '../lib/queryClient'
 import type { Priority, Task, TaskStatus } from '../lib/types'
 import { useWorkspace } from '../workspace/WorkspaceProvider'
@@ -25,17 +25,15 @@ const stamp = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short
 
 export function TaskDrawer({ task, allTasks, onClose, onOpen }: TaskDrawerProps) {
   return (
-    <RadixDialog.Root open={Boolean(task)} onOpenChange={(open) => !open && onClose()}>
-      <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/30 data-[state=open]:animate-[meridian-fade_150ms_ease-out]" />
-        <RadixDialog.Content
-          aria-describedby={undefined}
-          className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[560px] flex-col border-l border-rule bg-surface shadow-(--shadow-lift) outline-none data-[state=open]:animate-[meridian-slide_220ms_var(--ease-out-quint)]"
-        >
-          {task && <DrawerBody key={task.id} task={task} allTasks={allTasks} onClose={onClose} onOpen={onOpen} />}
-        </RadixDialog.Content>
-      </RadixDialog.Portal>
-    </RadixDialog.Root>
+    <Inspector
+      open={Boolean(task)}
+      onOpenChange={(open) => !open && onClose()}
+      title={task?.title ?? 'Task details'}
+      description="Task details, editing controls, subtasks, and provenance."
+      width="lg"
+    >
+      {task && <DrawerBody key={task.id} task={task} allTasks={allTasks} onClose={onClose} onOpen={onOpen} />}
+    </Inspector>
   )
 }
 
@@ -98,9 +96,7 @@ function DrawerBody({ task, allTasks, onClose, onOpen }: { task: Task; allTasks:
               <Trash size={17} weight="bold" />
             </button>
           )}
-          <RadixDialog.Close aria-label="Close" className="grid size-9 cursor-pointer place-items-center rounded-lg text-ink-3 hover:bg-sunken hover:text-ink">
-            <X size={18} weight="bold" />
-          </RadixDialog.Close>
+          <InspectorClose className="size-9" />
         </div>
       </header>
 
@@ -126,7 +122,6 @@ function DrawerBody({ task, allTasks, onClose, onOpen }: { task: Task; allTasks:
               aria-invalid={titleError ? true : undefined}
               className="field-sizing-content w-full resize-none rounded-lg border border-transparent bg-transparent px-2 py-1 -mx-2 font-display text-[26px] leading-tight font-semibold tracking-[-0.03em] text-ink hover:border-rule focus:border-cobalt focus:outline-none"
             />
-            <RadixDialog.Title className="sr-only">{task.title}</RadixDialog.Title>
             {titleError && (
               <p role="alert" className="mt-1 text-[13px] text-danger">
                 {titleError}
@@ -134,9 +129,9 @@ function DrawerBody({ task, allTasks, onClose, onOpen }: { task: Task; allTasks:
             )}
           </div>
         ) : (
-          <RadixDialog.Title className="font-display text-[26px] leading-tight font-semibold tracking-[-0.03em] text-ink">
+          <h1 className="font-display text-[26px] leading-tight font-semibold tracking-[-0.03em] text-ink">
             {task.title}
-          </RadixDialog.Title>
+          </h1>
         )}
 
         {task.source === 'agent' && (

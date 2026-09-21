@@ -49,6 +49,39 @@
   --radius-control: 8px;
   --radius-panel: 12px;
 
+  --frame-reading: 1080px;
+  --frame-operational: 1440px;
+  --frame-split: 1600px;
+  --frame-gutter: clamp(1.25rem, 3vw, 3rem);
+  --density-row: 42px;
+
+  /*
+    Navigation rail geometry. The expanded width is today's fixed column, so a
+    profile that has never collapsed the rail keeps the current layout. The
+    collapsed width leaves a centered hit area of at least 44px around the 18px
+    icons inside the rail's px-3 padding, and keeps the cobalt active marker
+    visible at the left edge.
+  */
+  --rail-expanded: 248px;
+  --rail-collapsed: 72px;
+
+  /*
+    Glass material. Declared once so translucent surfaces (the desktop rail, the
+    Tasks command bar) never invent local opacity or blur utilities. The base is
+    a tinted translucent layer rather than a thin wash, because these surfaces
+    sit over scrolling content and a low-alpha layer drops label contrast.
+    --glass-raised is for small raised chips inside a glass surface; --glass-edge
+    replaces a hard rule line where the material needs a softer boundary.
+  */
+  --glass-surface: rgb(244 245 242 / 0.72);
+  --glass-raised: rgb(255 255 255 / 0.55);
+  --glass-edge: rgb(17 20 24 / 0.08);
+  --glass-blur: 14px;
+
+  --duration-quick: 140ms;
+  --duration-panel: 200ms;
+  --duration-emphasized: 220ms;
+
   --shadow-panel: 0 1px 0 rgb(17 20 24 / 0.04), 0 8px 24px -12px rgb(39 67 201 / 0.12);
   --shadow-lift: 0 1px 0 rgb(17 20 24 / 0.05), 0 18px 40px -18px rgb(17 20 24 / 0.22);
   --shadow-control: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 1px 2px rgb(17 20 24 / 0.2);
@@ -86,6 +119,15 @@
   --color-danger: #ff7d74;
   --color-danger-wash: #3a1614;
 
+  /*
+    Glass over near-black graphite: a darker, slightly more opaque base with a
+    light edge. Rail widths are theme-independent and are deliberately not
+    redefined here.
+  */
+  --glass-surface: rgb(13 15 18 / 0.66);
+  --glass-raised: rgb(255 255 255 / 0.05);
+  --glass-edge: rgb(255 255 255 / 0.06);
+
   --shadow-panel: 0 1px 0 rgb(0 0 0 / 0.35), 0 10px 28px -14px rgb(0 0 0 / 0.7);
   --shadow-lift: 0 1px 0 rgb(0 0 0 / 0.4), 0 24px 48px -20px rgb(0 0 0 / 0.8);
   --shadow-control: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 1px 2px rgb(0 0 0 / 0.4);
@@ -102,6 +144,7 @@
     @apply bg-paper font-sans text-ink antialiased;
     font-feature-settings: 'ss01', 'cv11';
     text-rendering: optimizeLegibility;
+    overflow-x: clip;
   }
 
   ::selection {
@@ -152,6 +195,12 @@
 
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@utility bounded-overflow {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
 }
 
 @media (prefers-reduced-motion: reduce) {

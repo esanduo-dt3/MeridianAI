@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../components/Dialog'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState, RoleBadge, Skeleton } from '../components/Feedback'
 import { SelectField, TextField } from '../components/Field'
-import { PageHeader } from '../components/PageHeader'
+import { OperationalHeader } from '../components/OperationalHeader'
 import { apiFetch } from '../lib/api'
 import { errorText } from '../lib/queryClient'
 import type { AddMemberResult, AuthRole, Invite, Member, Roster } from '../lib/types'
@@ -17,19 +17,29 @@ import { useWorkspace, wsKey } from '../workspace/WorkspaceProvider'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
+/** Renders the workspace roster, invitations, roles, and membership actions. */
+// PUBLIC_INTERFACE
 export function MembersPage() {
   const { active, isAdmin } = useWorkspace()
   const rosterKey = wsKey(active?.id, 'members')
   const roster = useQuery({ queryKey: rosterKey, queryFn: () => apiFetch<Roster>('/members') })
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader
+    <div className="flex flex-col gap-5">
+      <OperationalHeader
+        eyebrow="Workspace access"
         title="Members"
         description={
           isAdmin
             ? `Add people to ${active?.name} and choose whether each one is an Admin or a Member.`
             : `People in ${active?.name}. Admins manage who's here and what they can do.`
+        }
+        status={
+          roster.isSuccess ? (
+            <span className="rounded-full bg-sunken px-2.5 py-1 text-xs font-medium text-ink-2 tabular">
+              {roster.data.members.length} {roster.data.members.length === 1 ? 'member' : 'members'}
+            </span>
+          ) : undefined
         }
       />
 
@@ -196,7 +206,7 @@ function MemberRow({ member, isSelf, canManage }: { member: Member; isSelf: bool
   })
 
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-3 px-4 py-3 sm:px-5">
       <Avatar name={member.profile.full_name} email={member.profile.email} src={member.profile.avatar_url} size={36} />
       <div className="min-w-0 flex-1">
         <p className="truncate font-medium text-ink">

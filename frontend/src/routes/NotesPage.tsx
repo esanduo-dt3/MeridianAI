@@ -22,6 +22,8 @@ function ago(iso: string): string {
   return 'just now'
 }
 
+/** Renders the searchable notes list and the selected workspace note editor. */
+// PUBLIC_INTERFACE
 export function NotesPage() {
   const { noteId } = useParams()
   const navigate = useNavigate()
@@ -42,9 +44,9 @@ export function NotesPage() {
   }
 
   return (
-    <div className="-my-8 flex min-h-[calc(100dvh-3.5rem)] flex-col lg:-my-12 lg:min-h-dvh lg:flex-row">
+    <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-(--radius-panel) border border-rule bg-surface shadow-(--shadow-hairline) lg:min-h-[calc(100dvh-5rem)] lg:flex-row">
       <aside
-        className={`flex flex-col border-rule py-6 lg:w-72 lg:shrink-0 lg:border-r lg:py-10 lg:pr-5 ${noteId ? 'hidden lg:flex' : 'flex'}`}
+        className={`flex flex-col border-rule p-4 sm:p-5 lg:w-72 lg:shrink-0 lg:border-r ${noteId ? 'hidden lg:flex' : 'flex'}`}
         aria-label="Notes"
       >
         <div className="flex items-center justify-between gap-2">
@@ -103,7 +105,7 @@ export function NotesPage() {
         </div>
       </aside>
 
-      <section className={`min-w-0 flex-1 py-6 lg:py-10 lg:pl-10 ${noteId ? 'block' : 'hidden lg:block'}`}>
+      <section className={`min-w-0 flex-1 bg-paper px-4 py-5 sm:px-6 lg:px-10 lg:py-8 ${noteId ? 'block' : 'hidden lg:block'}`}>
         {noteId ? (
           <OpenNote key={noteId} noteId={noteId} />
         ) : (

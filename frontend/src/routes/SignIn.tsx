@@ -9,6 +9,8 @@ import { Wordmark } from '../components/Wordmark'
 import { ThemeToggle } from '../theme/ThemeToggle'
 import { missingSupabaseConfig } from '../lib/supabaseClient'
 
+/** Renders the configured Google authentication entry point and its explicit failure states. */
+// PUBLIC_INTERFACE
 export function SignIn() {
   const { session, loading, configured, authError, clearAuthError, signInWithGoogle } = useAuth()
   const location = useLocation()
@@ -57,7 +59,7 @@ export function SignIn() {
   }
 
   return (
-    <div className="min-h-dvh px-5 sm:px-8">
+    <div className="min-h-dvh bg-paper px-5 sm:px-8">
       <div className="mx-auto grid min-h-dvh max-w-[1240px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16">
         <main className="flex flex-col py-8 lg:py-10">
           <div className="flex items-center justify-between gap-4">
@@ -68,7 +70,7 @@ export function SignIn() {
           <motion.div
             initial={reduce ? false : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
             className="my-auto max-w-[30rem] py-14"
           >
             <h1 className="font-display text-[44px] leading-[1.02] font-semibold tracking-[-0.045em] text-ink sm:text-[56px]">

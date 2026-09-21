@@ -20,7 +20,25 @@ function Monogram({ name, size = 32 }: { name: string; size?: number }) {
   )
 }
 
-export function WorkspaceSwitcher({ onNavigate }: { onNavigate?: () => void }) {
+interface WorkspaceSwitcherProps {
+  onNavigate?: () => void
+  /**
+   * Monogram-only trigger for the collapsed desktop rail. The accessible name
+   * and the entire dropdown content are identical in both presentations.
+   */
+  collapsed?: boolean
+}
+
+// PUBLIC_INTERFACE
+export function WorkspaceSwitcher({ onNavigate, collapsed = false }: WorkspaceSwitcherProps) {
+  /**
+   * Active-workspace trigger plus the workspace list, role badges and the
+   * create-workspace entry point.
+   *
+   * @param onNavigate - Invoked before navigating away, so the mobile drawer can close itself.
+   * @param collapsed - Render the monogram-only trigger used by the collapsed desktop rail.
+   * @returns The switcher, or `null` until an active workspace is resolved.
+   */
   const { workspaces, active, switchWorkspace } = useWorkspace()
   const navigate = useNavigate()
   const [creating, setCreating] = useState(false)
@@ -31,17 +49,26 @@ export function WorkspaceSwitcher({ onNavigate }: { onNavigate?: () => void }) {
     <>
       <Menu.Root>
         <Menu.Trigger
-          className="group flex w-full cursor-pointer items-center gap-3 rounded-(--radius-control) border border-rule bg-surface px-2.5 py-2 text-left shadow-(--shadow-hairline) transition-colors hover:border-rule-strong data-[state=open]:border-rule-strong"
+          className={
+            collapsed
+              ? 'group grid cursor-pointer place-items-center rounded-(--radius-control) border border-rule bg-surface p-1.5 shadow-(--shadow-hairline) transition-colors hover:border-rule-strong data-[state=open]:border-rule-strong'
+              : 'group flex w-full cursor-pointer items-center gap-3 rounded-(--radius-control) border border-rule bg-surface px-2.5 py-2 text-left shadow-(--shadow-hairline) transition-colors hover:border-rule-strong data-[state=open]:border-rule-strong'
+          }
           aria-label={`Workspace: ${active.name}. Switch workspace`}
+          title={collapsed ? active.name : undefined}
         >
           <Monogram name={active.name} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-ink">{active.name}</span>
-            <span className="block text-xs text-ink-3">
-              {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}
-            </span>
-          </span>
-          <CaretUpDown aria-hidden size={16} weight="bold" className="text-ink-3 group-hover:text-ink-2" />
+          {!collapsed && (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-ink">{active.name}</span>
+                <span className="block text-xs text-ink-3">
+                  {workspaces.length} {workspaces.length === 1 ? 'workspace' : 'workspaces'}
+                </span>
+              </span>
+              <CaretUpDown aria-hidden size={16} weight="bold" className="text-ink-3 group-hover:text-ink-2" />
+            </>
+          )}
         </Menu.Trigger>
 
         <Menu.Portal>

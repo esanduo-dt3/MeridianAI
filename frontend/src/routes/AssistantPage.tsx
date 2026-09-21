@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { useReducedMotion } from 'motion/react'
 import {
   ArrowRight,
   BookOpenText,
@@ -51,6 +52,7 @@ interface Message {
  * It can only propose a task: an Admin approves or rejects proposals on the
  * Tasks page.
  */
+// PUBLIC_INTERFACE
 export function AssistantPage() {
   const { active } = useWorkspace()
   // A conversation belongs to one workspace; switching workspace starts a fresh one.
@@ -64,10 +66,11 @@ function Conversation() {
   const [draft, setDraft] = useState('')
   const nextId = useRef(1)
   const endRef = useRef<HTMLDivElement>(null)
+  const reduceMotion = useReducedMotion()
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' })
-  }, [messages.length, chat.isPending])
+    endRef.current?.scrollIntoView({ block: 'end', behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [messages.length, chat.isPending, reduceMotion])
 
   function send(text: string) {
     const message = text.trim().slice(0, MAX_MESSAGE_CHARS)
@@ -105,14 +108,14 @@ function Conversation() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <PageHeader
         title="Assistant"
         description={`Ask about your work or the documents in ${active?.name ?? 'this workspace'}, or ask for a task. Document answers cite their passages; tasks it suggests wait for an Admin to approve them.`}
       />
 
       {messages.length === 0 ? (
-        <div className="flex flex-col items-start gap-4 rounded-(--radius-panel) border border-dashed border-rule-strong bg-surface/60 px-6 py-8">
+        <div className="flex flex-col items-start gap-4 rounded-(--radius-panel) border border-rule bg-surface px-5 py-6 shadow-(--shadow-hairline) sm:px-6 sm:py-8">
           <span className="grid size-11 place-items-center rounded-[10px] bg-sunken text-ink-2">
             <Robot aria-hidden size={22} weight="duotone" />
           </span>
