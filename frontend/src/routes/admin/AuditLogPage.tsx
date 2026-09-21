@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Gear, ListMagnifyingGlass, MagnifyingGlass, Robot, User } from '@phosphor-icons/react'
+import { CaretRight, Gear, ListMagnifyingGlass, MagnifyingGlass, Robot, User } from '@phosphor-icons/react'
 import { type AuditFilters, useAuditLog } from '../../admin/useAdmin'
 import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
@@ -90,7 +90,7 @@ function Log() {
         </EmptyState>
       ) : (
         <>
-          <ol className="divide-y divide-rule rounded-(--radius-panel) border border-rule bg-surface">
+          <ol className="surface-card divide-y divide-rule overflow-hidden">
             {entries.map((e) => (
               <Entry key={e.id} entry={e} />
             ))}
@@ -119,7 +119,13 @@ function Entry({ entry }: { entry: AuditEntry }) {
   return (
     <li>
       <details className="group">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-paper [&::-webkit-details-marker]:hidden">
+        <summary className="row-interactive flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <CaretRight
+            aria-hidden
+            size={12}
+            weight="bold"
+            className="shrink-0 text-ink-3 transition-transform duration-150 group-open:rotate-90"
+          />
           <span className="w-44 shrink-0 font-mono text-xs text-ink-3 tabular">{stamp.format(new Date(entry.timestamp))}</span>
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${actor.className}`}>
             <ActorIcon aria-hidden size={12} weight="bold" />

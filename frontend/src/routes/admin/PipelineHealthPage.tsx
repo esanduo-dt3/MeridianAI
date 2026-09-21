@@ -114,10 +114,10 @@ function Dashboard({ h }: { h: PipelineHealth }) {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-display text-xl font-semibold tracking-[-0.02em] text-ink">By day</h2>
-        <div className="bounded-overflow rounded-(--radius-panel) border border-rule bg-surface">
-          <table className="w-full min-w-[40rem] text-sm">
+        <div className="bounded-overflow max-h-[32rem] overflow-y-auto rounded-(--radius-panel) border border-rule bg-surface">
+          <table className="sticky-head w-full min-w-[40rem] text-sm">
             <caption className="sr-only">Pipeline figures per day</caption>
-            <thead className="border-b border-rule text-left text-xs text-ink-3">
+            <thead className="text-left text-xs text-ink-3">
               <tr>
                 <th scope="col" className="px-4 py-2 font-medium">Date</th>
                 <th scope="col" className="px-4 py-2 font-medium">Questions</th>
@@ -129,7 +129,7 @@ function Dashboard({ h }: { h: PipelineHealth }) {
             </thead>
             <tbody className="divide-y divide-rule">
               {[...h.by_day].reverse().filter((d) => d.questions > 0).map((d) => (
-                <tr key={d.date}>
+                <tr key={d.date} className="row-interactive">
                   <td className="px-4 py-2 font-mono text-xs text-ink-2 tabular">{d.date}</td>
                   <td className="px-4 py-2">
                     <span className="flex items-center gap-2">
@@ -158,7 +158,7 @@ function Dashboard({ h }: { h: PipelineHealth }) {
 
 function Tile({ label, value, detail, help, status }: { label: string; value: string; detail: string; help?: string; status?: 'good' | 'bad' }) {
   return (
-    <div className="flex flex-col gap-1 rounded-(--radius-panel) border border-rule bg-surface p-4" title={help}>
+    <div className="surface-card surface-card-interactive flex flex-col gap-1 p-4" title={help}>
       <span className="text-[13px] text-ink-2">{label}</span>
       <span className="font-display text-[28px] leading-none font-semibold tracking-[-0.02em] text-ink tabular">{value}</span>
       <span className="text-xs text-ink-3">{detail}</span>
