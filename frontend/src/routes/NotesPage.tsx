@@ -46,7 +46,7 @@ export function NotesPage() {
   return (
     <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-(--radius-panel) border border-rule bg-surface shadow-(--shadow-hairline) lg:min-h-[calc(100dvh-5rem)] lg:flex-row">
       <aside
-        className={`flex flex-col border-rule p-4 sm:p-5 lg:w-72 lg:shrink-0 lg:border-r ${noteId ? 'hidden lg:flex' : 'flex'}`}
+        className={`flex flex-col border-rule bg-sunken/35 p-4 sm:p-5 lg:w-72 lg:shrink-0 lg:border-r ${noteId ? 'hidden lg:flex' : 'flex'}`}
         aria-label="Notes"
       >
         <div className="flex items-center justify-between gap-2">
@@ -88,8 +88,10 @@ export function NotesPage() {
                   <Link
                     to={`/notes/${note.id}`}
                     aria-current={note.id === noteId ? 'page' : undefined}
-                    className={`block rounded-(--radius-control) px-3 py-2.5 transition-colors ${
-                      note.id === noteId ? 'bg-surface shadow-(--shadow-hairline)' : 'hover:bg-sunken'
+                    className={`block rounded-(--radius-control) border-l-2 px-3 py-2.5 transition-colors ${
+                      note.id === noteId
+                        ? 'border-cobalt bg-surface shadow-(--shadow-hairline)'
+                        : 'border-transparent hover:bg-surface/70'
                     }`}
                   >
                     <span className="block truncate text-sm font-medium text-ink">{note.title || 'Untitled'}</span>

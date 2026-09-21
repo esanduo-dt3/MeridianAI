@@ -115,8 +115,8 @@ function Conversation() {
       />
 
       {messages.length === 0 ? (
-        <div className="flex flex-col items-start gap-4 rounded-(--radius-panel) border border-rule bg-surface px-5 py-6 shadow-(--shadow-hairline) sm:px-6 sm:py-8">
-          <span className="grid size-11 place-items-center rounded-[10px] bg-sunken text-ink-2">
+        <div className="surface-card flex flex-col items-start gap-4 px-5 py-6 sm:px-6 sm:py-8">
+          <span className="grid size-11 place-items-center rounded-[10px] bg-cobalt-wash text-cobalt">
             <Robot aria-hidden size={22} weight="duotone" />
           </span>
           <p className="max-w-[56ch] text-[15px] leading-relaxed text-ink-2">
@@ -124,15 +124,21 @@ function Conversation() {
             fact from the documents, a wider explanation, or a summary. It can also propose new tasks. It sees only
             what you can see.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-3">
             {SUGGESTIONS.map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => send(s)}
-                className="min-h-10 cursor-pointer rounded-full border border-rule-strong bg-surface px-3.5 text-sm text-ink transition-colors hover:border-ink-3 hover:bg-paper"
+                className="group flex min-h-16 cursor-pointer items-center justify-between gap-3 rounded-(--radius-control) border border-rule-strong bg-surface px-3.5 py-2.5 text-left text-sm text-ink transition-[border-color,background-color,transform] duration-150 ease-out hover:-translate-y-px hover:border-cobalt hover:bg-cobalt-wash/40"
               >
-                {s}
+                <span className="min-w-0">{s}</span>
+                <ArrowRight
+                  aria-hidden
+                  size={14}
+                  weight="bold"
+                  className="shrink-0 text-ink-3 transition-colors group-hover:text-cobalt"
+                />
               </button>
             ))}
           </div>
@@ -166,11 +172,21 @@ function Conversation() {
           placeholder="What do I have to do this week? · Create a task for Sam to update the runbook by Friday"
           className="w-full resize-none bg-transparent px-1 text-[15px] leading-relaxed text-ink placeholder:text-ink-3 focus:outline-none disabled:opacity-60"
         />
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-rule pt-2">
           <ReliabilityNote compact />
-          <Button type="submit" disabled={!draft.trim()} loading={chat.isPending} leading={<PaperPlaneTilt aria-hidden size={16} weight="bold" />}>
-            Send
-          </Button>
+          <div className="flex items-center gap-3">
+            {draft.length > MAX_MESSAGE_CHARS * 0.8 && (
+              <span aria-live="polite" className="text-xs text-ink-3 tabular">
+                {draft.length} / {MAX_MESSAGE_CHARS}
+              </span>
+            )}
+            <span aria-hidden className="hidden text-xs text-ink-3 sm:inline">
+              Enter to send · Shift + Enter for a new line
+            </span>
+            <Button type="submit" disabled={!draft.trim()} loading={chat.isPending} leading={<PaperPlaneTilt aria-hidden size={16} weight="bold" />}>
+              Send
+            </Button>
+          </div>
         </div>
       </form>
 

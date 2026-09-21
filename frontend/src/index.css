@@ -380,3 +380,57 @@
   pointer-events: none;
   color: var(--color-ink-3);
 }
+
+/* ------------------------- Shared in-app surface helpers -------------------------
+   These are used by the operational routes (documents, members, notes, review,
+   pipeline health) so every list row, card and loading block behaves the same.
+   All values come from tokens; call sites never invent their own.
+*/
+.surface-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-hairline);
+  transition:
+    border-color var(--duration-quick) var(--ease-out-quint),
+    box-shadow var(--duration-quick) var(--ease-out-quint);
+}
+
+.surface-card-interactive:hover {
+  border-color: var(--color-rule-strong);
+  box-shadow: var(--shadow-panel);
+}
+
+/* A list row that responds to pointer without shifting layout. */
+.row-interactive {
+  transition: background-color var(--duration-quick) var(--ease-out-quint);
+}
+.row-interactive:hover {
+  background: color-mix(in srgb, var(--color-sunken) 55%, transparent);
+}
+
+/* Loading blocks: a slow sheen reads as "waiting" more clearly than a pulse. */
+.skeleton-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: meridian-scan 1.6s var(--ease-out-quint) infinite;
+}
+[data-theme='dark'] .skeleton-sheen::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.06), transparent);
+}
+
+/* Sticky table headers for the long evidence tables on admin routes. */
+.sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  box-shadow: inset 0 -1px 0 var(--color-rule);
+}

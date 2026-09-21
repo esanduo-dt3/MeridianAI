@@ -121,11 +121,13 @@ function UploadPanel() {
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`flex flex-col items-center justify-center gap-3 rounded-(--radius-panel) border-2 border-dashed px-6 py-9 text-center transition-colors ${
-          dragging ? 'border-cobalt bg-cobalt-wash/60' : 'border-rule-strong bg-surface/60'
+        className={`flex flex-col items-center justify-center gap-3 rounded-(--radius-panel) border-2 border-dashed px-6 py-9 text-center transition-[border-color,background-color,box-shadow] duration-150 ease-out ${
+          dragging
+            ? 'border-cobalt bg-cobalt-wash/60 shadow-(--shadow-panel)'
+            : 'border-rule-strong bg-surface/60 hover:border-ink-3 hover:bg-surface'
         }`}
       >
-        <span className="grid size-11 place-items-center rounded-xl bg-sunken text-ink-2">
+        <span className={`grid size-11 place-items-center rounded-xl transition-colors ${dragging ? 'bg-cobalt text-on-ink' : 'bg-sunken text-ink-2'}`}>
           <CloudArrowUp aria-hidden size={24} weight="duotone" />
         </span>
         <div>
@@ -211,14 +213,14 @@ function DocumentList({ docs }: { docs: DocumentSummary[] }) {
         {docs.length} {docs.length === 1 ? 'document' : 'documents'} ·{' '}
         {docs.filter((d) => d.parsed_status === 'ready').reduce((sum, d) => sum + d.chunk_count, 0)} passages searchable
       </h2>
-      <ul className="divide-y divide-rule overflow-hidden rounded-(--radius-panel) border border-rule bg-surface">
+      <ul className="surface-card divide-y divide-rule overflow-hidden">
         {docs.map((doc) => {
           const Icon = doc.doc_type === 'pdf' ? FilePdf : FileText
           // Passages can be previewed as soon as they are saved, before embedding finishes.
           const inspectable = doc.chunk_count > 0 && doc.parsed_status !== 'pending'
           const embedding = doc.parsed_status === 'processing' && doc.processing_stage === 'embedding'
           return (
-            <li key={doc.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
+            <li key={doc.id} className="row-interactive flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:px-5">
               <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-sunken text-ink-2">
                 <Icon aria-hidden size={20} weight="duotone" />
               </span>
