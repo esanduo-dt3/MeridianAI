@@ -62,8 +62,8 @@
     icons inside the rail's px-3 padding, and keeps the cobalt active marker
     visible at the left edge.
   */
-  --rail-expanded: 248px;
-  --rail-collapsed: 72px;
+  --rail-expanded: 264px;
+  --rail-collapsed: 84px;
 
   /*
     Glass material. Declared once so translucent surfaces (the desktop rail, the
@@ -201,6 +201,61 @@
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-gutter: stable;
+}
+
+/* ---------------------------- Liquid glass material ----------------------------
+   A single definition for floating translucent chrome (navigation rail, mobile
+   bar, page header). Surfaces stay token-driven: no local opacity or blur
+   values are invented at the call site. The ::before layer is the specular
+   sheen that makes the material read as glass rather than as flat translucency.
+*/
+.liquid-glass {
+  position: relative;
+  background: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur)) saturate(175%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(175%);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow-lift);
+}
+
+.liquid-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.55) 0%, rgb(255 255 255 / 0.06) 38%, transparent 70%),
+    radial-gradient(120% 60% at 50% -10%, rgb(39 67 201 / 0.07), transparent 60%);
+  opacity: 0.9;
+}
+
+[data-theme='dark'] .liquid-glass::before {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.1) 0%, rgb(255 255 255 / 0.02) 40%, transparent 72%),
+    radial-gradient(120% 60% at 50% -10%, rgb(128 152 255 / 0.1), transparent 60%);
+}
+
+/* Content inside a glass surface must sit above the sheen layer. */
+.liquid-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes meridian-flow-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+@keyframes meridian-glass-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0) scale(1.03);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

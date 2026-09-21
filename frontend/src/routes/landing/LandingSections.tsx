@@ -14,6 +14,7 @@ import {
   UsersThree,
   type Icon,
 } from '@phosphor-icons/react'
+import { FlowDiagram } from './FlowDiagram'
 
 /*
   Landing content for the public (signed-out) page.
@@ -142,6 +143,11 @@ export function HowItWorksSection() {
           title="From a folder of documents to an answer you can defend"
           lede="Meridian is a workspace assistant for teams whose documents actually matter. It reads what you give it, answers from that, and shows the evidence."
         />
+      </div>
+
+      {/* Animated walkthrough of the pipeline; the written steps below repeat it in prose. */}
+      <div className="mt-10">
+        <FlowDiagram />
       </div>
 
       <ol className="mt-10 grid gap-4 md:grid-cols-3">
